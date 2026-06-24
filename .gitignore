@@ -1,0 +1,5 @@
+# python build artefacts
+__pycache__/
+*.parquet
+*.joblib
+.DS_Store
