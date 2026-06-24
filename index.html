@@ -1,103 +1,699 @@
-"""Vorstmodel: voorspel nachtelijke min-temp + vorstkans uit avondcondities."""
-import pandas as pd, numpy as np, json
-from sklearn.ensemble import HistGradientBoostingRegressor, HistGradientBoostingClassifier
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, roc_auc_score
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agrometeo Randwijk · nachtvorst & VD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#e8ecf6; --mut:#8b97b8; --shadow:rgba(0,0,0,.45);
+    --bg:#0b1020; --bg2:#121a31; --panel:#161f3a; --line:#26314f;
+    --accent:#6fe3ff; --field:#0e1530; --bgA:#1a2647; --bgB:#10243a;
+    --danger:#ff5d6c; --warm:#ffb45c; --ok:#5fd6a0;
+  }
+  body[data-view="vd"]{
+    --ink:#f6efe2; --mut:#bda884; --shadow:rgba(0,0,0,.5);
+    --bg:#1a1206; --bg2:#241a0b; --panel:#2a1f0e; --line:#473516;
+    --accent:#ffc24b; --field:#160f05; --bgA:#3a2a10; --bgB:#2b1c2a;
+  }
+  body[data-view="today"]{
+    --ink:#e8ecf6; --mut:#8b97b8; --shadow:rgba(0,0,0,.45);
+    --bg:#0d1117; --bg2:#141a24; --panel:#161d29; --line:#293243;
+    --accent:#7c89ff; --field:#0d1320; --bgA:#1c2740; --bgB:#1a2030;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, var(--bgA) 0%, transparent 55%),
+      radial-gradient(900px 500px at 0% 110%, var(--bgB) 0%, transparent 50%),
+      var(--bg);
+    color:var(--ink); font-family:Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; min-height:100vh; line-height:1.5;
+    transition:background-color .6s ease, color .4s ease;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:28px 20px 64px}
+  .topbar{display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between}
+  .brand{font:500 12px/1 "JetBrains Mono",monospace; letter-spacing:.22em; text-transform:uppercase; color:var(--accent); opacity:.9}
+  .seg{display:inline-flex; background:var(--field); border:1px solid var(--line); border-radius:12px; padding:4px}
+  .seg button{border:0; background:transparent; color:var(--mut); cursor:pointer; font:500 13px Inter; padding:8px 14px; border-radius:9px; transition:.2s}
+  .seg button.on{background:var(--accent); color:#10141f}
+  body[data-view="vd"] .seg button.on{color:#231702}
+  .fcbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:16px;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:11px 13px;
+    transition:background .6s, border-color .6s}
+  .fcbar input, .fcbar select{background:var(--field); color:var(--ink); border:1px solid var(--line);
+    border-radius:9px; padding:8px 10px; font:14px Inter}
+  .fcbar input{width:150px}
+  .fcbar .refresh{background:var(--accent); color:#10141f; border:0; cursor:pointer; font-weight:600; padding:8px 14px; border-radius:9px}
+  body[data-view="vd"] .fcbar .refresh{color:#231702}
+  .fcbar .stat{font:500 12px "JetBrains Mono",monospace; color:var(--mut); margin-left:auto}
+  .fcbar .stat.err{color:var(--danger)}
+  .autofill{font:500 10px "JetBrains Mono",monospace; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--accent); opacity:.85; margin-left:7px}
+  .autofill.hidden{display:none}
+  header{margin-top:24px}
+  h1{font-family:Fraunces,serif; font-weight:500; font-size:clamp(28px,5vw,46px); letter-spacing:-.01em; margin:0 0 .15em}
+  header p{color:var(--mut); margin:0; max-width:62ch}
+  .modes{display:inline-flex; margin-top:18px; background:var(--field); border:1px solid var(--line); border-radius:12px; padding:4px}
+  .modes button{border:0; background:transparent; color:var(--mut); cursor:pointer; font:500 13px Inter; padding:7px 13px; border-radius:9px}
+  .modes button.on{background:var(--accent); color:#231702}
+  .grid{display:grid; grid-template-columns:1.05fr .95fr; gap:22px; margin-top:22px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:18px; padding:22px; box-shadow:0 18px 40px -28px var(--shadow); transition:background .6s, border-color .6s}
+  .card h2{font:600 12px/1 "JetBrains Mono",monospace; letter-spacing:.18em; text-transform:uppercase; color:var(--mut); margin:0 0 18px; display:flex; align-items:center}
+  .field{margin-bottom:16px} .field.hidden{display:none}
+  .field label{display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--mut); margin-bottom:6px}
+  .field label b{color:var(--ink); font-weight:500; font-family:"JetBrains Mono",monospace}
+  .field.fc label b{color:var(--accent)}
+  input[type=range]{width:100%; accent-color:var(--accent); height:4px}
+  input[type=date]{width:100%; background:var(--field); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px 11px; font:14px Inter}
+  .hint{font-size:11.5px; color:var(--mut); opacity:.8; margin-top:4px}
+  .big{font-family:Fraunces,serif; font-weight:300; letter-spacing:-.02em; line-height:.95}
+  .big small{font-size:.28em; color:var(--mut); font-family:"JetBrains Mono",monospace; letter-spacing:.05em; vertical-align:super}
+  .sub{color:var(--mut); font-size:13px; margin-top:5px}
+  .status{margin-top:18px; padding:13px 15px; border-radius:13px; border:1px solid; display:flex; gap:11px; align-items:flex-start; font-size:13.5px}
+  .status .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 10px}
+  .status b{font-weight:600}
+  .readout{display:flex; gap:16px; align-items:stretch}
+  .thermo{display:flex; gap:7px; flex:0 0 auto}
+  .ticks{position:relative; width:26px; height:200px}
+  .ticks span{position:absolute; right:0; transform:translateY(-50%); font:500 10px "JetBrains Mono",monospace; color:var(--mut); white-space:nowrap}
+  .scale{position:relative; width:30px; height:200px; flex:0 0 30px; border-radius:15px;
+    background:linear-gradient(180deg,#ff5d4d 0%,#ff9f4a 22%,#ffd36b 40%,#cfe8a0 55%,#9fe6ff 72%,#6fe3ff 88%,#b9c8ff 100%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.10)}
+  .frostline{position:absolute; left:-4px; right:-4px; height:2px; background:#6fe3ff; box-shadow:0 0 8px #6fe3ff; transition:top .5s cubic-bezier(.22,1,.36,1)}
+  .marker{position:absolute; left:-7px; right:-7px; height:0; display:flex; align-items:center; transition:top .5s cubic-bezier(.22,1,.36,1)}
+  .marker::before{content:""; flex:1; height:3px; background:var(--ink); border-radius:2px; box-shadow:0 0 8px rgba(232,236,246,.7)}
+  .tmin .pm{font-size:.42em; color:var(--mut)}
+  .gauge{margin-top:22px}
+  .gauge .track{position:relative; height:16px; border-radius:9px; background:linear-gradient(90deg,#5fc9d6 0%,#5fc9d6 8.33%,#74d68a 8.33%,#74d68a 41.67%,#ffc24b 41.67%,#ffc24b 58.33%,#ff5d4d 58.33%,#ff5d4d 100%); box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+  .gauge .needle span{position:absolute; bottom:26px; left:50%; transform:translateX(-50%); white-space:nowrap; font:600 11px "JetBrains Mono",monospace; color:var(--ink); background:var(--bg2); border:1px solid var(--line); border-radius:7px; padding:2px 7px; box-shadow:0 4px 12px -6px var(--shadow)}
+  .gauge .needle span::after{content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:4px solid transparent; border-top-color:var(--line)}
+  .gauge .needle{position:absolute; top:-5px; width:3px; height:26px; background:var(--ink); border-radius:2px; box-shadow:0 0 8px rgba(246,239,226,.7); transition:left .5s cubic-bezier(.22,1,.36,1)}
+  .gauge .ticks{display:flex; justify-content:space-between; font:500 11px "JetBrains Mono",monospace; color:var(--mut); margin-top:8px}
+  .view{display:none} .view.on{display:block}
+  .chartcard #chartBox{width:100%}
+  .chartcard svg{width:100%; height:auto; display:block}
+  .chartmsg{color:var(--mut); font-size:14px; padding:40px 10px; text-align:center}
+  .legend{display:flex; flex-wrap:wrap; gap:14px 18px; margin-top:14px; font-size:12px; color:var(--mut)}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .legend i{width:16px; height:3px; border-radius:2px; display:inline-block}
+  .legend i.dash{height:0; border-top:2px dashed var(--c); background:none; width:18px}
+  .legend i.solid{height:3px; background:var(--ink); width:16px}
+  .legend i.dot2{width:9px; height:9px; border-radius:50%; border:2px dashed var(--mut); background:none}
+  .legend i.diam{width:11px; height:11px; transform:rotate(45deg); border:2px solid var(--c); background:var(--bg2)}
+  .legend i.fdot{width:10px; height:10px; border-radius:50%; background:var(--c)}
+  .legend i.shade{width:16px; height:11px; border-radius:3px; background:var(--accent); opacity:.18}
+  .legend i.cband{width:16px; height:11px; border-radius:3px; background:#74d68a; opacity:.45}
+  .legend i.curve{width:20px; height:0; border-top:2.4px solid var(--ink)}
+  .legend i.curve.dashed{border-top:2.4px dashed var(--mut)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:22px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .vcard{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:18px; padding:20px}
+  .vcard .vh{font:600 12px/1 "JetBrains Mono",monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--mut); margin-bottom:14px}
+  .vrow{display:flex; justify-content:space-between; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--line)}
+  .vrow:last-child{border-bottom:0}
+  .vrow span{color:var(--mut); font-size:13px}
+  .vrow b{font-family:"JetBrains Mono",monospace; font-weight:500; font-size:16px; color:var(--ink)}
+  .vrow b.delta{font-size:13px}
+  .vmuted{color:var(--mut); font-size:13px; padding:6px 0}
+  footer{margin-top:26px; color:var(--mut); font-size:12px; line-height:1.6}
+  .pill{display:inline-block; font:500 11px "JetBrains Mono",monospace; color:var(--mut); border:1px solid var(--line); border-radius:999px; padding:3px 10px; margin:2px 4px 2px 0}
+</style>
+</head>
+<body data-view="frost">
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">FRC Randwijk · agrometeo</div>
+    <div class="seg">
+      <button id="tabFrost" class="on">Nachtvorst</button>
+      <button id="tabVd">VD-piek</button>
+      <button id="tabToday">Klopt het?</button>
+    </div>
+  </div>
 
-d = pd.read_parquet("../data/weer_clean.parquet").set_index("dt").sort_index()
-# Uurgemiddelden (robuust tegen ontbrekende kwartieren)
-h = d[["temp","hum","dewpt","wind","rain"]].resample("1h").mean()
-h["hour"] = h.index.hour
+  <div class="fcbar" id="fcbar">
+    <input id="loc" type="text" value="Randwijk" placeholder="Plaats" aria-label="Plaats">
+    <select id="daySel" aria-label="Dag"></select>
+    <button class="refresh" id="refresh">Ververs</button>
+    <span class="stat" id="fcStat">Weersbericht laden…</span>
+  </div>
 
-EVE = 19  # avond-afkapuur
-def night_id(ts):
-    # nacht hoort bij de datum van de avond (>=12u dag D; <12u -> vorige dag)
-    return (ts.normalize() if ts.hour >= 12 else ts.normalize() - pd.Timedelta(days=1))
+  <!-- ============ VORST ============ -->
+  <div class="view on" id="viewFrost">
+    <header>
+      <h1>Komt er nachtvorst?</h1>
+      <p>De avondcondities (≈19:00) en de minimumtemperatuur van de afgelopen nacht komen uit het
+         weersbericht. Het model schat de laagste temperatuur tot 09:00 en de kans op nachtvorst.</p>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2>Avondcondities · 19:00 <span class="autofill" id="f_af">uit weersbericht</span></h2>
+        <div class="field"><label for="f_t">Temperatuur <b id="f_tV">8,0 °C</b></label>
+          <input id="f_t" type="range" min="-12" max="28" step="0.5" value="8"></div>
+        <div class="field"><label for="f_rh">Relatieve luchtvochtigheid <b id="f_rhV">85 %</b></label>
+          <input id="f_rh" type="range" min="20" max="100" step="1" value="85">
+          <div class="hint">Hieruit volgt het dauwpunt — de sterkste vorstvoorspeller.</div></div>
+        <div class="field"><label for="f_w">Windsnelheid <b id="f_wV">3 km/h</b></label>
+          <input id="f_w" type="range" min="0" max="60" step="1" value="3">
+          <div class="hint">Weinig wind + heldere lucht = uitstralingsvorst.</div></div>
+        <div class="field"><label for="f_tmax">Maximumtemperatuur vandaag <b id="f_tmaxV">14 °C</b></label>
+          <input id="f_tmax" type="range" min="-5" max="38" step="0.5" value="14"></div>
+        <div class="field"><label for="f_tprev">Minimum afgelopen nacht <b id="f_tprevV">5 °C</b></label>
+          <input id="f_tprev" type="range" min="-15" max="22" step="0.5" value="5"></div>
+        <div class="field"><label for="f_rain">Neerslag vandaag <b id="f_rainV">0 mm</b></label>
+          <input id="f_rain" type="range" min="0" max="40" step="0.5" value="0"></div>
+        <div class="field"><label for="f_d">Datum (seizoen)</label><input id="f_d" type="date"></div>
+      </section>
+      <section class="card">
+        <h2>Voorspelling · komende nacht</h2>
+        <div class="readout">
+          <div class="thermo">
+            <div class="ticks" id="f_ticks"></div>
+            <div class="scale">
+              <div class="frostline" id="f_fline"></div>
+              <div class="marker" id="f_marker"></div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+            <div class="big tmin"><span class="pm" id="f_sign"></span><span id="f_tmin">5,1</span><small> °C</small></div>
+            <div class="sub" id="f_sub">verwachte laagste temperatuur · dauwpunt 5,6 °C</div></div>
+        </div>
+        <div style="margin-top:16px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:6px">
+          <span>Kans op nachtvorst</span><b id="f_probV" style="color:var(--ink);font-family:'JetBrains Mono',monospace">8 %</b></div>
+          <div style="height:9px;border-radius:6px;background:var(--field);overflow:hidden;border:1px solid var(--line)">
+            <div id="f_probFill" style="height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--ok),var(--warm),var(--danger));transition:width .5s"></div></div></div>
+        <div class="status" id="f_status"><span class="dot" id="f_dot"></span><div id="f_statusTxt"></div></div>
+      </section>
+    </div>
+    <section class="card chartcard">
+      <h2>Temperatuurverwachting · komende nacht</h2>
+      <div id="f_chart"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i style="background:#6fe3ff"></i>Verwachte temperatuur (°C)</span>
+        <span><i class="diam" style="--c:#a7c2ff"></i>voorspeld nachtminimum</span>
+        <span><i class="shade"></i>nachtvenster 18–09 u</span>
+      </div>
+    </section>
+    <footer>
+      <div style="margin-bottom:8px"><span class="pill">MAE ≈ 1,9 °C</span><span class="pill">ROC-AUC 0,99</span><span class="pill">Open-Meteo</span></div>
+      Schat <em>uitstralingsvorst</em> op stationshoogte; geen vervanging voor een officiële waarschuwing,
+      en kent geen aanvoer van koude lucht of bewolkingsverandering in de nacht. In de bloeiperiode: aan de veilige kant blijven.
+    </footer>
+  </div>
 
-h["night"] = [night_id(t) for t in h.index]
-# Nachtvenster = [D 18:00, D+1 09:00)
-h["in_night"] = ((h.index.hour >= 18) | (h.index.hour < 9))
+  <!-- ============ VD ============ -->
+  <div class="view" id="viewVd">
+    <header>
+      <h1 id="v_h1">Hoe hoog wordt de VD morgen?</h1>
+      <p>De ochtendcondities (≈08:00) en de verwachte dagmaximum-temperatuur komen uit het weersbericht.
+         De hoogste VD (vochtdeficit, in g/m³) tussen 10:00 en 18:00 wordt afgelezen uit de uurverwachting.
+         Gezonde zone: <b>2–10 g/m³</b> (huidmondjes open).</p>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2>Ochtendcondities · 08:00 <span class="autofill" id="v_af">uit weersbericht</span></h2>
+        <div class="field"><label for="v_t">Temperatuur <b id="v_tV">9,0 °C</b></label>
+          <input id="v_t" type="range" min="-5" max="32" step="0.5" value="9"></div>
+        <div class="field"><label for="v_rh">Relatieve luchtvochtigheid <b id="v_rhV">90 %</b></label>
+          <input id="v_rh" type="range" min="20" max="100" step="1" value="90">
+          <div class="hint">Bepaalt het dauwpunt — de vochtbasis die overdag ongeveer gelijk blijft.</div></div>
+        <div class="field"><label for="v_w">Windsnelheid <b id="v_wV">3 km/h</b></label>
+          <input id="v_w" type="range" min="0" max="60" step="1" value="3"></div>
+        <div class="field" id="v_tmaxField"><label for="v_tmax">Verwachte dagmaximum <b id="v_tmaxV">18 °C</b></label>
+          <input id="v_tmax" type="range" min="-5" max="40" step="0.5" value="18">
+          <div class="hint">Uit het weersbericht.</div></div>
+        <div class="field"><label for="v_prev">VD-piek gisteren <b id="v_prevV">5,0 g/m³</b></label>
+          <input id="v_prev" type="range" min="0" max="25" step="0.5" value="5"></div>
+        <div class="field"><label for="v_d">Datum (seizoen)</label><input id="v_d" type="date"></div>
+      </section>
+      <section class="card">
+        <h2>Verwachte dagpiek VD</h2>
+        <div class="big"><span id="v_vd">5,3</span><small> g/m³</small></div>
+        <div class="sub" id="v_sub">piek uit de uurverwachting</div>
+        <div class="gauge"><div class="track"><div class="needle" id="v_needle"><span id="v_peakLabel"></span></div></div>
+          <div class="ticks"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div></div>
+        <div class="status" id="v_status"><span class="dot" id="v_dot"></span><div id="v_bandTxt"></div></div>
+      </section>
+    </div>
+    <section class="card chartcard">
+      <h2>VD-verwachting · over de dag</h2>
+      <div id="v_chart"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i style="background:#ffc24b"></i>Verwachte VD (g/m³)</span>
+        <span><i class="diam" style="--c:#4fd0e0"></i>verwachte dagpiek</span>
+        <span><i class="cband"></i>gunstige zone 2–10 g/m³</span>
+        <span><i class="shade"></i>dagvenster 10–18 u</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>VD-kaart · vochtdeficit (temperatuur × RV)</h2>
+      <div id="v_map"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#74d68a"></i>iso-lijnen VD=2 en VD=10</span>
+        <span><i class="cband"></i>gunstige zone 2–10 g/m³</span>
+        <span><i class="fdot" style="--c:#4fd0e0"></i>verwachte dagpiek (T, RV)</span>
+      </div>
+    </section>
+    <footer>
+      <div style="margin-bottom:8px"><span class="pill" id="v_accPill">piek = top van de uurverwachting</span><span class="pill">VD in g/m³</span><span class="pill">Open-Meteo</span></div>
+      Zones vochtdeficit: te nat &lt; 2 · gunstig 2–10 · stress &gt; 10 g/m³.
+      Algemene teeltindicaties — stem af op gewas en groeifase.
+    </footer>
+  </div>
 
-rows = []
-for nid, g in h.groupby("night"):
-    night = g[g["in_night"]]
-    eve = g[(g.index.normalize()==nid) & (g["hour"]==EVE)]
-    if eve.empty or night["temp"].notna().sum() < 6:  # genoeg metingen vereist
-        continue
-    e = eve.iloc[0]
-    tmin = night["temp"].min()
-    if pd.isna(tmin) or pd.isna(e["temp"]) or pd.isna(e["dewpt"]):
-        continue
-    # dag-context (dag D, 09-18u)
-    day = g[(g.index.normalize()==nid) & (g["hour"]>=9) & (g["hour"]<=18)]
-    rows.append({
-        "night": nid,
-        "t_eve": e["temp"], "td_eve": e["dewpt"], "rh_eve": e["hum"], "wind_eve": e["wind"],
-        "dewdep_eve": e["temp"]-e["dewpt"],            # dauwpuntsdepressie
-        "tmax_day": day["temp"].max(), "rain_day": g[g.index.normalize()==nid]["rain"].sum(),
-        "doy": nid.dayofyear, "month": nid.month,
-        "tmin_night": tmin,
-    })
+  <!-- ============ VALIDATIE ============ -->
+  <div class="view" id="viewToday">
+    <header>
+      <h1>Klopt de voorspelling?</h1>
+      <p>Het werkelijke verloop van de gekozen dag naast de modelvoorspelling. Zo zie je hoe dicht
+         de voorspelde nachtvorst en VD-piek bij de werkelijkheid liggen. Doorgetrokken = al gemeten,
+         gestippeld = nog verwacht.</p>
+    </header>
+    <section class="card chartcard">
+      <h2>Verloop · <span id="t_date">—</span></h2>
+      <div id="chartBox"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i style="background:#ff9f4a"></i>Temperatuur (°C)</span>
+        <span><i style="background:#4fd0e0"></i>VD (g/m³)</span>
+        <span><i class="curve"></i>werkelijk&nbsp;&nbsp;<i class="curve dashed"></i>verwacht</span>
+        <span><i class="diam" style="--c:#7c89ff"></i>voorspeld&nbsp;&nbsp;<i class="fdot" style="--c:#7c89ff"></i>werkelijk (Tmin)</span>
+        <span><i class="diam" style="--c:#4fd0e0"></i>voorspeld&nbsp;&nbsp;<i class="fdot" style="--c:#4fd0e0"></i>werkelijk (VD-piek)</span>
+      </div>
+    </section>
+    <div class="grid2">
+      <div class="vcard" id="valFrost"></div>
+      <div class="vcard" id="valVd"></div>
+    </div>
+    <footer>
+      Het <em>werkelijke</em> verloop komt uit de gerealiseerde Open-Meteo-analyse (niet rechtstreeks van
+      het Davis-station). De voorspelling is de uitkomst van het model op basis van de avond-/ochtendcondities.
+      Een afwijking van 1–2 °C of ~1–2 g/m³ ligt binnen de getoetste nauwkeurigheid van de modellen.
+    </footer>
+  </div>
+</div>
 
-nd = pd.DataFrame(rows).dropna(subset=["t_eve","td_eve","wind_eve","tmax_day"]).reset_index(drop=True)
-nd["doy_sin"] = np.sin(2*np.pi*nd.doy/365); nd["doy_cos"] = np.cos(2*np.pi*nd.doy/365)
-nd["tmin_prev"] = nd["tmin_night"].shift(1)          # gisteren bekend bij voorspelling
-nd = nd.dropna(subset=["tmin_prev"]).reset_index(drop=True)
-nd["frost"] = (nd.tmin_night <= 0).astype(int)
+<script>
+/* ===== modellen ===== */
+const FROST = {
+ mean:[13.985337802313355,9.750510286613634,77.85331230283911,2.835193217665615,4.234827515699721,16.583688222923236,0.31633083596214506,8.25095294426919,0.04228713774519254,-0.09313058051258077],
+ scale:[7.516968120182253,6.258690379711778,15.887232391656665,3.3160620991107876,3.675519329952826,7.6185668308279535,0.8106176377459678,5.621161016271389,0.7275218531075218,0.6784176045812094],
+ lin:[2.9109689204626252,3.3147702896144158,0.47764832522332223,0.21417422726478358,0.30894672275041646,-1.2298811003597254,0.07556395796795383,0.6654579436135554,-0.03905612223457271,0.27847004553000965],
+ lin_int:8.253023133543639,
+ log:[-1.990331637110022,-2.625100041623802,0.16864203619583304,-0.2315125081407641,0.3995160356195296,0.09805311601034976,-0.48050861555269697,-0.21863842922361568,0.4941203735229564,-0.09284006517523827],
+ log_int:-7.063002498881626 };
+const VD = {
+ fc:{mean:[10.18080487159121,91.19102462271644,8.750872431605451,2.6176926131850675,0.9290241569687562,16.623398199629335,5.24566971560245,0.04337979140680323,-0.09653340884272281],
+  scale:[6.082417610976241,7.5637380902910705,6.027042312655852,3.0698470158281186,0.9993626233572439,7.604931077575362,4.437426499241767,0.7282947114580864,0.6770423235935021],
+  coef:[-16.406359622262446,-2.0828402718946997,13.325015361534946,0.2279514592430565,2.0807381066810673,5.218659321500105,0.8393105975200839,0.3430784318857837,0.1158527280709851], int:5.2454654101468865},
+ morn:{mean:[10.18080487159121,91.19102462271644,8.750872431605451,2.6176926131850675,0.9290241569687562,1.4299324399857596,5.24566971560245,0.04337979140680323,-0.09653340884272281],
+  scale:[6.082417610976241,7.5637380902910705,6.027042312655852,3.0698470158281186,0.9993626233572439,1.3378711176693574,4.437426499241767,0.7282947114580864,0.6770423235935021],
+  coef:[-0.1697830637608332,-0.7833306864461014,0.03632280373975153,-0.32643284703553077,1.161732751778952,-0.9355240243907337,2.2167565181443125,-0.023473463955022412,-1.0596013011621168], int:5.245465410146885}
+};
+const DEFAULT_PLACE = {name:"Randwijk", lat:51.937, lon:5.719};
+const FC = {hourly:null, daily:null, place:DEFAULT_PLACE};
 
-print(f"Bruikbare nachten: {len(nd)}  | vorstnachten (Tmin<=0): {nd.frost.sum()} ({nd.frost.mean()*100:.1f}%)")
-print("Per jaar:", nd.groupby(nd.night.dt.year).size().to_dict())
+const $=id=>document.getElementById(id);
+const svp=T=>0.6108*Math.exp(17.27*T/(T+237.3));
+const vdGm3=(T,RH)=>{const es=svp(T)*1000,ea=es*Math.max(0,Math.min(100,RH))/100;return Math.max(0,2.16679*(es-ea)/(T+273.15));};
+const dewpoint=(T,RH)=>{const a=17.62,b=243.12,g=Math.log(Math.max(1,Math.min(100,RH))/100)+a*T/(b+T);return b*g/(a-g);};
+const nl=(x,n=1)=>x.toFixed(n).replace('.',',');
+const doyOf=el=>{const dt=el.valueAsDate||new Date();return Math.round((dt-new Date(dt.getFullYear(),0,0))/864e5);};
 
-FEATS = ["t_eve","td_eve","rh_eve","wind_eve","dewdep_eve","tmax_day","rain_day","tmin_prev","doy_sin","doy_cos"]
-# Tijd-gebaseerde split: train t/m 2024, test = 2025 (echt out-of-sample)
-tr = nd[nd.night.dt.year <= 2024]; te = nd[nd.night.dt.year == 2025]
-Xtr, ytr = tr[FEATS], tr.tmin_night; Xte, yte = te[FEATS], te.tmin_night
-print(f"\nTrain nachten: {len(tr)}  |  Test (2025): {len(te)}")
+const THERMO={top:30,bot:-15};
+function thermoPct(v){return Math.max(0,Math.min(1,(THERMO.top-v)/(THERMO.top-THERMO.bot)));}
+function buildThermoTicks(){const t=$('f_ticks'); if(!t) return; let s="";
+  for(let v=THERMO.top; v>=THERMO.bot+5; v-=10){const c=v===0?'#6fe3ff':'var(--mut)';
+    s+=`<span style="top:${(thermoPct(v)*100).toFixed(1)}%;color:${c}">${v>0?'+':''}${v}°</span>`;}
+  t.innerHTML=s;}
 
-def report(name, pred):
-    mae = mean_absolute_error(yte, pred); rmse = mean_squared_error(yte, pred)**0.5
-    # vorst-classificatie afgeleid uit voorspelde Tmin <= 0
-    pf = (pred <= 0).astype(int); af = (yte.values <= 0).astype(int)
-    tp = int(((pf==1)&(af==1)).sum()); fp=int(((pf==1)&(af==0)).sum())
-    fn = int(((pf==0)&(af==1)).sum()); tn=int(((pf==0)&(af==0)).sum())
-    rec = tp/(tp+fn) if tp+fn else 0; prec = tp/(tp+fp) if tp+fp else 0
-    print(f"{name:32s} MAE={mae:.2f}C RMSE={rmse:.2f}C | vorst recall={rec:.0%} precision={prec:.0%} (TP{tp} FP{fp} FN{fn} TN{tn})")
-    return dict(mae=mae,rmse=rmse,recall=rec,precision=prec)
+function showFrost(tmin, prob, sub){
+  $('f_tmin').textContent=nl(Math.abs(tmin),1);$('f_sign').textContent=tmin<0?'−':'';
+  if(sub!=null)$('f_sub').textContent=sub;
+  $('f_probV').textContent=Math.round(prob*100)+' %';$('f_probFill').style.width=(prob*100)+'%';
+  $('f_marker').style.top=(thermoPct(tmin)*100)+'%';$('f_fline').style.top=(thermoPct(0)*100)+'%';
+  let c,head,body;
+  if(prob>=0.5||tmin<=-1){c='var(--danger)';head='Vorst waarschijnlijk';body='Grote kans op nachtvorst. In de bloeiperiode beschermende maatregelen overwegen (beregening, kachels, ventilatie).';}
+  else if(prob>=0.2||tmin<=1.5){c='var(--warm)';head='Vorst mogelijk';body='Grensgeval. Houd het verloop in de gaten; bij heldere, windstille nacht zakt de temperatuur verder dan deze schatting.';}
+  else{c='var(--ok)';head='Vorst onwaarschijnlijk';body='De condities wijzen op een rustige nacht zonder vorst.';}
+  $('f_dot').style.background=c;$('f_status').style.borderColor=c;$('f_status').style.background='color-mix(in srgb, '+c+' 12%, transparent)';
+  $('f_statusTxt').innerHTML='<b>'+head+'</b><br>'+body;
+}
+function predictFrost(){
+  const T=+$('f_t').value,RH=+$('f_rh').value,W=+$('f_w').value,TMAX=+$('f_tmax').value,
+        TPREV=+$('f_tprev').value,RAIN=+$('f_rain').value,doy=doyOf($('f_d'));
+  const td=dewpoint(T,RH);
+  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,Math.sin(2*Math.PI*doy/365),Math.cos(2*Math.PI*doy/365)];
+  let tmin=FROST.lin_int,logit=FROST.log_int;
+  for(let i=0;i<x.length;i++){const zi=(x[i]-FROST.mean[i])/FROST.scale[i];tmin+=FROST.lin[i]*zi;logit+=FROST.log[i]*zi;}
+  showFrost(tmin,1/(1+Math.exp(-logit)),'verwachte laagste temperatuur · dauwpunt '+nl(td)+' °C');
+  $('f_tV').textContent=nl(T)+' °C';$('f_rhV').textContent=RH+' %';$('f_wV').textContent=W+' km/h';
+  $('f_tmaxV').textContent=nl(TMAX)+' °C';$('f_tprevV').textContent=nl(TPREV)+' °C';$('f_rainV').textContent=nl(RAIN)+' mm';
+}
+let VMODE="fc";
+function showVd(vd, sub){
+  $('v_vd').textContent=nl(vd,1);
+  if(sub!=null)$('v_sub').textContent=sub;
+  $('v_needle').style.left=Math.min(100,Math.max(0,vd/24*100))+'%';
+  $('v_peakLabel').textContent=nl(vd,1)+' g/m³';
+  let col,head,body;
+  if(vd<2){col='#5fc9d6';head='Te nat (VD < 2)';body='Vochtdeficit te laag: weinig verdamping, risico op lang nat blad en schimmeldruk. Meer luchten/stoken kan helpen.';}
+  else if(vd<=10){col='#74d68a';head='Gunstig (2–10)';body='Huidmondjes open, gezonde verdamping — de streefzone (2–10 g/m³).';}
+  else if(vd<=14){col='#ffc24b';head='Oplopende stress (> 10)';body='Vochtdeficit boven de gezonde grens. Verdampingsvraag hoog; houd bodemvocht in de gaten en geef tijdig water.';}
+  else{col='#ff5d4d';head='Sterke verdampingsstress';body='Zeer hoog vochtdeficit: kans op bladsluiting en groeiremming. Overweeg beregening, schermen of extra watergift rond het middaguur.';}
+  $('v_dot').style.background=col;$('v_status').style.borderColor=col;$('v_status').style.background='color-mix(in srgb, '+col+' 12%, transparent)';
+  $('v_bandTxt').innerHTML='<b>'+head+'</b><br>'+body;
+}
+function predictVd(){
+  const T=+$('v_t').value,RH=+$('v_rh').value,W=+$('v_w').value,TMAX=+$('v_tmax').value,
+        VPREV=+$('v_prev').value,doy=doyOf($('v_d'));
+  const td=dewpoint(T,RH),vm=vdGm3(T,RH),dd=T-td;
+  const s=Math.sin(2*Math.PI*doy/365),c=Math.cos(2*Math.PI*doy/365),M=VD[VMODE];
+  const vals=VMODE==="fc"?[T,RH,td,W,vm,TMAX,VPREV,s,c]:[T,RH,td,W,vm,dd,VPREV,s,c];
+  let vd=M.int; for(let i=0;i<vals.length;i++) vd+=M.coef[i]*((vals[i]-M.mean[i])/M.scale[i]);
+  showVd(Math.max(0,vd),'wat-als · dauwpunt '+nl(td)+' °C · ochtend-VD '+nl(vm,1)+' g/m³');
+  $('v_tV').textContent=nl(T)+' °C';$('v_rhV').textContent=RH+' %';$('v_wV').textContent=W+' km/h';
+  $('v_tmaxV').textContent=nl(TMAX)+' °C';$('v_prevV').textContent=nl(VPREV,1)+' g/m³';
+}
+function setVdMode(m){VMODE=m;} // toggle verwijderd; what-if gebruikt altijd het fc-model
 
-print("\n=== Voorspelling nachtelijke minimumtemperatuur (test 2025) ===")
-report("Baseline: Tmin = avondtemp", Xte.t_eve.values)
-report("Baseline: Tmin = avond-dauwpunt", Xte.td_eve.values)
-lin = LinearRegression().fit(Xtr, ytr); report("Lineaire regressie", lin.predict(Xte))
-gbr = HistGradientBoostingRegressor(max_iter=400, learning_rate=0.05, max_depth=4,
-                                    l2_regularization=1.0, random_state=0).fit(Xtr, ytr)
-m_gbr = report("Gradient boosting (Tmin)", gbr.predict(Xte))
 
-# Aparte vorst-kans classifier (gekalibreerde kans)
-clf = HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, max_depth=4,
-                                     l2_regularization=1.0, random_state=0).fit(Xtr, tr.frost)
-p = clf.predict_proba(Xte)[:,1]
-auc = roc_auc_score(te.frost, p)
-print(f"\nVorst-kans classifier: ROC-AUC = {auc:.3f}")
-for thr in (0.3,0.5):
-    pf=(p>=thr).astype(int); af=te.frost.values
-    tp=int(((pf==1)&(af==1)).sum());fp=int(((pf==1)&(af==0)).sum());fn=int(((pf==0)&(af==1)).sum())
-    rec=tp/(tp+fn) if tp+fn else 0; prec=tp/(tp+fp) if tp+fp else 0
-    print(f"  drempel {thr}: recall={rec:.0%} precision={prec:.0%}")
+/* ===== Open-Meteo ===== */
+const clamp=(el,v)=>{const lo=+el.min,hi=+el.max,st=+el.step||1;v=Math.max(lo,Math.min(hi,v));return Math.round(v/st)*st;};
+const setS=(id,v)=>{const el=$(id);if(v==null||isNaN(v))return;el.value=clamp(el,v);};
+function idxAt(date,hour){return FC.hourly.time.indexOf(date+"T"+String(hour).padStart(2,"0")+":00");}
+function prevDate(date){const d=new Date(date+"T00:00:00");d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+function rangeAgg(d0,h0,d1,h1,arr,fn){let acc=fn==="min"?Infinity:-Infinity,found=false;
+  const lo=d0+"T"+String(h0).padStart(2,"0")+":00", hi=d1+"T"+String(h1).padStart(2,"0")+":00";
+  for(let i=0;i<FC.hourly.time.length;i++){const ts=FC.hourly.time[i],val=arr[i];
+    if(ts>=lo&&ts<=hi&&val!=null){found=true;acc=fn==="min"?Math.min(acc,val):Math.max(acc,val);}}
+  return found?acc:null;}
 
-# Voorjaarsvorst (mrt-mei) apart: dat is wat fruittelers raakt
-spring = te[te.month.isin([3,4,5])]
-if len(spring):
-    sp = gbr.predict(spring[FEATS])
-    print(f"\nVoorjaar 2025 (mrt-mei, {len(spring)} nachten): MAE={mean_absolute_error(spring.tmin_night, sp):.2f}C")
+async function fetchForecast(){
+  const stat=$('fcStat'); stat.classList.remove('err'); stat.textContent="Weersbericht laden…";
+  const name=$('loc').value.trim()||"Randwijk";
+  let place={...DEFAULT_PLACE};
+  try{
+    if(name.toLowerCase()!=="randwijk"){
+      const gr=await fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(name)+"&count=1&language=nl");
+      const gj=await gr.json();
+      if(gj.results&&gj.results[0]){const r=gj.results[0];place={name:r.name,lat:r.latitude,lon:r.longitude};}
+    }
+    const url="https://api.open-meteo.com/v1/forecast?latitude="+place.lat+"&longitude="+place.lon+
+      "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,precipitation,vapour_pressure_deficit"+
+      "&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FAmsterdam&past_days=3&forecast_days=3";
+    const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    FC.hourly=j.hourly; FC.daily=j.daily; FC.place=place;
+    FC.hourly.vd_gm3=FC.hourly.temperature_2m.map((t,i)=>{const r=FC.hourly.relative_humidity_2m[i];return (t==null||r==null)?null:vdGm3(t,r);});
+    buildDaySelect(); applyCurrentView();
+    stat.textContent="✓ "+place.name+" · Open-Meteo";
+  }catch(e){
+    stat.classList.add('err'); stat.textContent="Geen verbinding — vul handmatig in";
+  }
+}
+function buildDaySelect(){
+  const sel=$('daySel'), prev=sel.value; sel.innerHTML="";
+  const today=new Date().toLocaleDateString('sv-SE');
+  FC.daily.time.forEach(d=>{ if(d>=today){const o=document.createElement('option');o.value=d;sel.appendChild(o);} });
+  if([...sel.options].some(o=>o.value===prev)) sel.value=prev;            // bewaar keuze
+  else { const tom=nextDate(today);                                        // standaard: morgen
+    sel.value=[...sel.options].some(o=>o.value===tom)?tom:(sel.options[0]?sel.options[0].value:""); }
+  relabelDays();
+}
+function relabelDays(){
+  const view=document.body.dataset.view;
+  [...$('daySel').options].forEach(o=>{
+    const d=new Date(o.value+"T12:00:00");
+    const lbl=d.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
+    o.textContent=(view==="frost"?"Nacht van ":"")+lbl;
+  });
+}
+function applyCurrentView(){
+  if(!FC.hourly) return;
+  const D=$('daySel').value; if(!D) return;
+  const v=document.body.dataset.view;
+  if(v==="frost") applyFrost(D); else if(v==="vd") applyVd(D); else renderToday(D);
+}
+function applyFrost(D){
+  const i=idxAt(D,19), h=FC.hourly, di=FC.daily.time.indexOf(D);
+  if(i>=0){ setS('f_t',h.temperature_2m[i]); setS('f_rh',h.relative_humidity_2m[i]); setS('f_w',h.wind_speed_10m[i]); }
+  if(di>=0){ setS('f_tmax',FC.daily.temperature_2m_max[di]); setS('f_rain',FC.daily.precipitation_sum[di]); }
+  setS('f_tprev',rangeAgg(prevDate(D),18,D,9,h.temperature_2m,"min"));
+  $('f_d').value=D; $('f_af').classList.remove('hidden');
+  predictFrost();                          // labels + zet basiswaarden
+  const r=renderFrostChart(D);             // tekent curve + dip op de lijn
+  const fp=frostPredict(D);                // kans uit het model
+  if(r) showFrost(r.min, fp?fp.prob:0, 'laagste rond '+pad2(r.hour)+':00 · uit weersbericht');
+}
+function applyVd(D){
+  const i=idxAt(D,8), h=FC.hourly, di=FC.daily.time.indexOf(D);
+  if(i>=0){ setS('v_t',h.temperature_2m[i]); setS('v_rh',h.relative_humidity_2m[i]); setS('v_w',h.wind_speed_10m[i]); }
+  if(di>=0){ setS('v_tmax',FC.daily.temperature_2m_max[di]); }
+  setS('v_prev',rangeAgg(prevDate(D),10,prevDate(D),18,h.vd_gm3,"max"));
+  $('v_d').value=D; $('v_af').classList.remove('hidden');
+  predictVd();
+  const r=renderVdChart(D);
+  renderVdMap(D, r);
+  if(r) showVd(r.peak, 'verwachte dagpiek · rond '+pad2(r.hour)+':00 (uit weersbericht)');
+  $('v_h1').textContent='Hoe hoog wordt de VD '+relDay(D)+'?';
+}
 
-# Feature-belang via permutatie (snel, op test)
-from sklearn.inspection import permutation_importance
-imp = permutation_importance(gbr, Xte, yte, n_repeats=8, random_state=0, scoring="neg_mean_absolute_error")
-order = np.argsort(imp.importances_mean)[::-1]
-print("\nBelangrijkste voorspellers (Tmin):")
-for i in order[:6]:
-    print(f"  {FEATS[i]:12s} {imp.importances_mean[i]:.3f}")
+/* ===== validatie: voorspelling rechtstreeks uit het weersbericht ===== */
+const pad2=n=>String(n).padStart(2,'0');
+function nextDate(date){const d=new Date(date+"T00:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);}
+function relDay(D){const today=new Date().toLocaleDateString('sv-SE');
+  if(D===today)return 'vandaag'; if(D===nextDate(today))return 'morgen'; if(D===nextDate(nextDate(today)))return 'overmorgen';
+  return 'op '+new Date(D+"T12:00:00").toLocaleDateString('nl-NL',{day:'numeric',month:'long'});}
 
-nd.to_parquet("../data/nights.parquet")
-import joblib; joblib.dump({"gbr":gbr,"clf":clf,"lin":lin,"feats":FEATS}, "../models/frost_sklearn.joblib")
-print("\nModellen opgeslagen.")
+/* generieke lijngrafiek (SVG) */
+function lineChart(xs, ys, opt){
+  const W=720,H=240,ml=42,mr=16,mt=16,mb=28,pw=W-ml-mr,ph=H-mt-mb;
+  const valid=ys.filter(v=>v!=null);
+  if(!valid.length) return '<div class="chartmsg">Geen data.</div>';
+  let vmin=opt.vmin!=null?opt.vmin:Math.min(...valid,(opt.pred!=null?opt.pred:Infinity));
+  let vmax=opt.vmax!=null?opt.vmax:Math.max(...valid,(opt.pred!=null?opt.pred:-Infinity));
+  if(opt.vmin==null) vmin=Math.floor(vmin-1);
+  if(opt.vmax==null) vmax=Math.ceil(vmax+1);
+  const span=opt.minSpan||2; if(vmax-vmin<span) vmax=vmin+span;
+  const n=xs.length, dec=opt.decimals||0;
+  const X=i=>ml+(n<2?pw/2:i/(n-1)*pw), Y=v=>mt+(1-(v-vmin)/(vmax-vmin))*ph;
+  let shade="";
+  if(opt.winFrom!=null&&opt.winTo!=null){const x0=X(opt.winFrom),x1=X(opt.winTo);
+    shade=`<rect x="${x0}" y="${mt}" width="${Math.max(0,x1-x0)}" height="${ph}" fill="${opt.color}" opacity="0.10"/>`;}
+  let yband="";
+  if(opt.bandLo!=null&&opt.bandHi!=null){const yhi=Y(Math.min(opt.bandHi,vmax)),ylo=Y(Math.max(opt.bandLo,vmin));
+    yband=`<rect x="${ml}" y="${yhi.toFixed(1)}" width="${pw}" height="${Math.max(0,ylo-yhi).toFixed(1)}" fill="#74d68a" opacity="0.13"/>`;}
+  let grid="",yl="";
+  for(let g=0;g<=4;g++){const gy=mt+g/4*ph,gv=vmax-g/4*(vmax-vmin);
+    grid+=`<line x1="${ml}" y1="${gy}" x2="${ml+pw}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>`;
+    yl+=`<text x="${ml-6}" y="${gy+3.5}" text-anchor="end" class="ax">${gv.toFixed(dec)}</text>`;}
+  let xl="",step=Math.max(1,Math.round(n/7));
+  for(let i=0;i<n;i+=step){xl+=`<text x="${X(i)}" y="${H-9}" text-anchor="middle" class="ax">${pad2(xs[i]%24)}</text>`;}
+  let d=""; xs.forEach((_,i)=>{if(ys[i]==null)return;d+=(d?"L":"M")+X(i).toFixed(1)+" "+Y(ys[i]).toFixed(1)+" ";});
+  let pred="";
+  if(opt.pred!=null){const py=Y(opt.pred);
+    pred=`<line x1="${ml}" y1="${py}" x2="${ml+pw}" y2="${py}" stroke="${opt.predColor}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".7"/>`;
+    if(opt.predDotIdx!=null){const px=X(opt.predDotIdx);
+      pred+=`<path d="M ${px} ${py-5} L ${px+5} ${py} L ${px} ${py+5} L ${px-5} ${py} Z" fill="var(--bg2)" stroke="${opt.predColor}" stroke-width="2"/>`;}
+    pred+=`<text x="${ml+pw-2}" y="${py-6}" text-anchor="end" class="ax" fill="${opt.predColor}">${nl(opt.pred,dec)}${opt.unit||''}</text>`;}
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${shade}${yband}${grid}${pred}<path d="${d.trim()}" fill="none" stroke="${opt.color}" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+}
+function renderFrostChart(D){
+  const box=$('f_chart'); if(!box) return null;
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht — klik op Ververs.</div>';return null;}
+  const h=FC.hourly, ND=nextDate(D), xs=[], ys=[];
+  for(let k=12;k<=23;k++){const i=idxAt(D,k); xs.push(k); ys.push(i>=0?h.temperature_2m[i]:null);}
+  for(let k=0;k<=12;k++){const i=idxAt(ND,k); xs.push(k); ys.push(i>=0?h.temperature_2m[i]:null);}
+  if(ys.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze nacht.</div>';return null;}
+  let dipIdx=null,lo=Infinity; for(let idx=6;idx<=21;idx++){if(ys[idx]!=null&&ys[idx]<lo){lo=ys[idx];dipIdx=idx;}}
+  box.innerHTML=lineChart(xs,ys,{color:'#6fe3ff',pred:dipIdx!=null?ys[dipIdx]:null,predColor:'#a7c2ff',
+    predDotIdx:dipIdx,winFrom:6,winTo:21,decimals:0,unit:' °C',minSpan:5});
+  return dipIdx!=null?{min:ys[dipIdx],hour:xs[dipIdx]}:null;
+}
+function renderVdMap(D, peak){
+  const box=$('v_map'); if(!box) return;
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht — klik op Ververs.</div>';return;}
+  const W=720,H=320,ml=42,mr=16,mt=14,mb=30,pw=W-ml-mr,ph=H-mt-mb;
+  const T0=5,T1=35; const X=t=>ml+(t-T0)/(T1-T0)*pw, Y=rh=>mt+(1-rh/100)*ph;
+  const esk=t=>0.6108*Math.exp(17.27*t/(t+237.3));
+  const rhForVD=(t,vd)=>100*(1-vd*(t+273.15)/(2166.79*esk(t)));
+  const curve=vd=>{let d="";for(let t=T0;t<=T1+0.01;t+=0.5){let rh=rhForVD(t,vd);if(rh<-2||rh>102)continue;rh=Math.max(0,Math.min(100,rh));d+=(d?"L":"M")+X(t).toFixed(1)+" "+Y(rh).toFixed(1)+" ";}return d.trim();};
+  let top="",bot="";
+  for(let t=T0;t<=T1+0.01;t+=0.5){let r=rhForVD(t,2);if(r>=0&&r<=100)top+=(top?"L":"M")+X(t).toFixed(1)+" "+Y(Math.min(100,r)).toFixed(1)+" ";}
+  for(let t=T1;t>=T0-0.01;t-=0.5){let r=rhForVD(t,10);r=Math.max(0,Math.min(100,r));bot+="L"+X(t).toFixed(1)+" "+Y(r).toFixed(1)+" ";}
+  const zone=`<path d="${top}${bot}Z" fill="#74d68a" opacity="0.14"/>`;
+  let grid="",xl="",yl="";
+  for(let rh=0;rh<=100;rh+=20){const y=Y(rh);grid+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;yl+=`<text x="${ml-6}" y="${y+3.5}" text-anchor="end" class="ax">${rh}</text>`;}
+  for(let t=5;t<=35;t+=5){xl+=`<text x="${X(t)}" y="${H-9}" text-anchor="middle" class="ax">${t}</text>`;}
+  let iso="";const vals=[2,4,6,8,10,12,14,16];
+  vals.forEach(vd=>{const d=curve(vd);if(!d)return;const bound=(vd===2||vd===10);
+    iso+=`<path d="${d}" fill="none" stroke="${bound?'#74d68a':'var(--mut)'}" stroke-width="${bound?2:1}" opacity="${bound?0.9:0.45}"/>`;
+    let r=rhForVD(35,vd);if(r>=2&&r<=99) iso+=`<text x="${ml+pw-2}" y="${Y(r)-2}" text-anchor="end" class="ax" fill="${bound?'#74d68a':'var(--mut)'}">${vd}</text>`;});
+  // canoniek piekpunt: zelfde uur als de dagpiek; toon VD + T + RV
+  let pt=""; const h=FC.hourly;
+  let pkH = peak ? peak.hour : null;
+  if(pkH==null){let hi=-Infinity;for(let k=10;k<=18;k++){const i=idxAt(D,k);if(i>=0&&h.vd_gm3[i]!=null&&h.vd_gm3[i]>hi){hi=h.vd_gm3[i];pkH=k;}}}
+  const ip = pkH!=null ? idxAt(D,pkH) : -1;
+  if(ip>=0){const t=h.temperature_2m[ip],rh=h.relative_humidity_2m[ip],vd=peak?peak.peak:h.vd_gm3[ip];
+    if(t!=null&&rh!=null){const cx=X(Math.max(T0,Math.min(T1,t))),cy=Y(Math.max(0,Math.min(100,rh)));
+      const lx = cx>ml+pw-150 ? cx-9 : cx+9, anc = cx>ml+pw-150 ? 'end':'start';
+      pt=`<circle cx="${cx}" cy="${cy}" r="6" fill="none" stroke="#4fd0e0" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="2.5" fill="#4fd0e0"/>`+
+         `<text x="${lx}" y="${cy-6}" text-anchor="${anc}" class="ax" fill="#4fd0e0">${nl(vd,1)} g/m³</text>`+
+         `<text x="${lx}" y="${cy+8}" text-anchor="${anc}" class="ax">${nl(t,1)} °C · ${Math.round(rh)} %</text>`;}}
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VD-kaart"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${grid}${zone}${iso}${pt}${yl}${xl}<text x="${ml+pw/2}" y="${H-9}" text-anchor="middle" class="ax">temperatuur (°C)</text><text transform="rotate(-90)" x="${-(mt+ph/2)}" y="13" text-anchor="middle" class="ax">RV (%)</text><line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+}
+function renderVdChart(D){
+  const box=$('v_chart'); if(!box) return null;
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht — klik op Ververs.</div>';return null;}
+  const h=FC.hourly, xs=[], ys=[];
+  for(let k=0;k<24;k++){const i=idxAt(D,k); xs.push(k); ys.push(i>=0?h.vd_gm3[i]:null);}
+  if(ys.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze dag.</div>';return null;}
+  let peakIdx=null,hi=-Infinity; for(let idx=10;idx<=18;idx++){if(ys[idx]!=null&&ys[idx]>hi){hi=ys[idx];peakIdx=idx;}}
+  box.innerHTML=lineChart(xs,ys,{color:'#ffc24b',pred:peakIdx!=null?ys[peakIdx]:null,predColor:'#4fd0e0',
+    predDotIdx:peakIdx,winFrom:10,winTo:18,vmin:0,decimals:1,unit:' g/m³',minSpan:4,bandLo:2,bandHi:10});
+  return peakIdx!=null?{peak:ys[peakIdx],hour:xs[peakIdx]}:null;
+}
+function doyD(D){const dd=new Date(D+"T12:00:00");return Math.round((dd-new Date(dd.getFullYear(),0,0))/864e5);}
+function localNowTs(){const n=new Date();return n.toLocaleDateString('sv-SE')+"T"+pad2(n.getHours())+":00";}
+
+function frostPredict(nightStart){ // nacht [nightStart 18:00 -> +1 09:00]
+  const h=FC.hourly, i=idxAt(nightStart,19), di=FC.daily.time.indexOf(nightStart);
+  if(i<0||h.temperature_2m[i]==null||h.relative_humidity_2m[i]==null) return null;
+  const T=h.temperature_2m[i],RH=h.relative_humidity_2m[i],W=h.wind_speed_10m[i]==null?3:h.wind_speed_10m[i];
+  const TMAX=di>=0?FC.daily.temperature_2m_max[di]:T, RAIN=di>=0?FC.daily.precipitation_sum[di]:0;
+  let TPREV=rangeAgg(prevDate(nightStart),18,nightStart,9,h.temperature_2m,"min"); if(TPREV==null)TPREV=T;
+  const td=dewpoint(T,RH),doy=doyD(nightStart),s=Math.sin(2*Math.PI*doy/365),cc=Math.cos(2*Math.PI*doy/365);
+  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,s,cc];
+  let tmin=FROST.lin_int,logit=FROST.log_int;
+  for(let k=0;k<x.length;k++){const zi=(x[k]-FROST.mean[k])/FROST.scale[k];tmin+=FROST.lin[k]*zi;logit+=FROST.log[k]*zi;}
+  return {tmin,prob:1/(1+Math.exp(-logit))};
+}
+function vdPredict(D){ // VD-piek dag D (10-18u), g/m3
+  const h=FC.hourly, i=idxAt(D,8), di=FC.daily.time.indexOf(D);
+  if(i<0||h.temperature_2m[i]==null||h.relative_humidity_2m[i]==null) return null;
+  const T=h.temperature_2m[i],RH=h.relative_humidity_2m[i],W=h.wind_speed_10m[i]==null?3:h.wind_speed_10m[i];
+  const TMAX=di>=0?FC.daily.temperature_2m_max[di]:T;
+  let VPREV=rangeAgg(prevDate(D),10,prevDate(D),18,h.vd_gm3,"max"); if(VPREV==null)VPREV=5;
+  const td=dewpoint(T,RH),vm=vdGm3(T,RH),doy=doyD(D);
+  const s=Math.sin(2*Math.PI*doy/365),cc=Math.cos(2*Math.PI*doy/365),M=VD.fc;
+  const vals=[T,RH,td,W,vm,TMAX,VPREV,s,cc];
+  let vd=M.int; for(let k=0;k<vals.length;k++) vd+=M.coef[k]*((vals[k]-M.mean[k])/M.scale[k]);
+  return Math.max(0,vd);
+}
+
+function renderToday(D){
+  const box=$('chartBox');
+  $('t_date').textContent=new Date(D+"T12:00:00").toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht geladen — klik op Ververs.</div>';$('valFrost').innerHTML='';$('valVd').innerHTML='';return;}
+  const h=FC.hourly, nowTs=localNowTs();
+  const hrs=[],temps=[],vds=[],past=[];
+  for(let k=0;k<24;k++){const i=idxAt(D,k); if(i<0) continue;
+    hrs.push(k); temps.push(h.temperature_2m[i]); vds.push(h.vd_gm3[i]);
+    past.push((D+"T"+pad2(k)+":00")<=nowTs);}
+  if(hrs.length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze dag.</div>';$('valFrost').innerHTML='';$('valVd').innerHTML='';return;}
+
+  const fp=frostPredict(prevDate(D)), vp=vdPredict(D);
+  const realMin=rangeAgg(prevDate(D),18,D,9,h.temperature_2m,"min");
+  const realVd=rangeAgg(D,10,D,18,h.vd_gm3,"max");
+  const nightDone=(D+"T09:00")<=nowTs, vdDone=(D+"T18:00")<=nowTs;
+
+  const Wd=720,Hd=320,ml=42,mr=46,mt=18,mb=30, pw=Wd-ml-mr, ph=Hd-mt-mb;
+  const tArr=temps.filter(v=>v!=null), vArr=vds.filter(v=>v!=null);
+  let tMin=Math.min(...tArr), tMax=Math.max(...tArr);
+  if(fp) tMin=Math.min(tMin,fp.tmin); if(realMin!=null) tMin=Math.min(tMin,realMin);
+  tMin=Math.floor(tMin-1); tMax=Math.ceil(tMax+1); if(tMax-tMin<4)tMax=tMin+4;
+  let vMax=Math.max(...vArr,(vp||0),(realVd||0),8)*1.12; vMax=Math.ceil(vMax*10)/10;
+  const X=k=>ml+(k/23)*pw, Yt=v=>mt+(1-(v-tMin)/(tMax-tMin))*ph, Yv=v=>mt+(1-v/vMax)*ph;
+
+  let lastPast=-1; past.forEach((p,idx)=>{if(p)lastPast=idx;});
+  const seg=(arr,Y,from,to)=>{let d="";for(let idx=from;idx<=to;idx++){if(arr[idx]==null)continue;d+=(d?"L":"M")+X(hrs[idx]).toFixed(1)+" "+Y(arr[idx]).toFixed(1)+" ";}return d.trim();};
+  const tSolid=lastPast>=0?seg(temps,Yt,0,lastPast):"", tDash=lastPast<hrs.length-1?seg(temps,Yt,Math.max(0,lastPast),hrs.length-1):"";
+  const vSolid=lastPast>=0?seg(vds,Yv,0,lastPast):"", vDash=lastPast<hrs.length-1?seg(vds,Yv,Math.max(0,lastPast),hrs.length-1):"";
+
+  let grid="",xax="",yL="",yR="";
+  for(let g=0;g<=4;g++){const ty=mt+g/4*ph, tv=tMax-g/4*(tMax-tMin);
+    grid+=`<line x1="${ml}" y1="${ty}" x2="${ml+pw}" y2="${ty}" stroke="var(--line)" stroke-width="1"/>`;
+    yL+=`<text x="${ml-6}" y="${ty+3.5}" text-anchor="end" class="ax">${tv.toFixed(0)}</text>`;
+    yR+=`<text x="${ml+pw+6}" y="${ty+3.5}" text-anchor="start" class="ax vdc">${(vMax-g/4*vMax).toFixed(1)}</text>`;}
+  for(let k=0;k<=24;k+=3){xax+=`<text x="${X(Math.min(k,23))}" y="${Hd-10}" text-anchor="middle" class="ax">${pad2(k%24)}</text>`;}
+  let nowLine=""; const nn=new Date();
+  if(D===nn.toLocaleDateString('sv-SE')){const nx=X(nn.getHours()+nn.getMinutes()/60);
+    nowLine=`<line x1="${nx}" y1="${mt}" x2="${nx}" y2="${mt+ph}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/><text x="${nx}" y="${mt-6}" text-anchor="middle" class="ax" fill="var(--accent)">nu</text>`;}
+  // faint referentielijnen (achtergrond) + voorspelpunten op verwacht tijdstip
+  const refF=fp?`<line x1="${ml}" y1="${Yt(fp.tmin)}" x2="${ml+pw}" y2="${Yt(fp.tmin)}" stroke="#7c89ff" stroke-width="1" stroke-dasharray="4 5" opacity=".35"/>`:"";
+  const refV=vp!=null?`<line x1="${ml}" y1="${Yv(vp)}" x2="${ml+pw}" y2="${Yv(vp)}" stroke="#4fd0e0" stroke-width="1" stroke-dasharray="4 5" opacity=".3"/>`:"";
+  const diamond=(cx,cy,r,c)=>`<path d="M ${cx} ${cy-r} L ${cx+r} ${cy} L ${cx} ${cy+r} L ${cx-r} ${cy} Z" fill="var(--bg2)" stroke="${c}" stroke-width="2"/>`;
+  let dots="";
+  // --- nachtvorst: voorspeld (ruit) vs werkelijk (stip) op het uur van de dip ---
+  let fHour=6, fActual=null;
+  if(realMin!=null){let mi=0;temps.forEach((v,idx)=>{if(v!=null&&v<=temps[mi])mi=idx;});fHour=hrs[mi];fActual=temps[mi];}
+  if(fp){const xF=X(fHour), yP=Yt(fp.tmin);
+    if(fActual!=null){const yA=Yt(fActual);
+      dots+=`<line x1="${xF}" y1="${yP}" x2="${xF}" y2="${yA}" stroke="#7c89ff" stroke-width="1.5" opacity=".55"/>`;
+      dots+=`<circle cx="${xF}" cy="${yA}" r="4" fill="#7c89ff" stroke="var(--bg2)" stroke-width="2"/>`;}
+    dots+=diamond(xF,yP,5,"#7c89ff");}
+  // --- VD-piek: voorspeld (ruit) vs werkelijk (stip) op het uur van de piek ---
+  let vHour=14, vActual=null;
+  if(realVd!=null){let xi=0;vds.forEach((v,idx)=>{if(v!=null&&v>=vds[xi])xi=idx;});vHour=hrs[xi];vActual=vds[xi];}
+  if(vp!=null){const xV=X(vHour), yP=Yv(vp);
+    if(vActual!=null){const yA=Yv(vActual);
+      dots+=`<line x1="${xV}" y1="${yP}" x2="${xV}" y2="${yA}" stroke="#4fd0e0" stroke-width="1.5" opacity=".55"/>`;
+      dots+=`<circle cx="${xV}" cy="${yA}" r="4" fill="#4fd0e0" stroke="var(--bg2)" stroke-width="2"/>`;}
+    dots+=diamond(xV,yP,5,"#4fd0e0");}
+
+  box.innerHTML=`<svg viewBox="0 0 ${Wd} ${Hd}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verloop">
+    <style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.vdc{fill:#4fd0e0}</style>
+    ${grid}${nowLine}${refF}${refV}
+    ${vSolid?`<path d="${vSolid}" fill="none" stroke="#4fd0e0" stroke-width="2"/>`:""}
+    ${vDash?`<path d="${vDash}" fill="none" stroke="#4fd0e0" stroke-width="2" stroke-dasharray="2 4" opacity=".85"/>`:""}
+    ${tSolid?`<path d="${tSolid}" fill="none" stroke="#ff9f4a" stroke-width="2.4"/>`:""}
+    ${tDash?`<path d="${tDash}" fill="none" stroke="#ff9f4a" stroke-width="2.4" stroke-dasharray="2 4" opacity=".85"/>`:""}
+    ${dots}${yL}${yR}${xax}
+    <line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+
+  const dC=(p,a)=>{const d=a-p,col=Math.abs(d)<=2?'#5fd6a0':(Math.abs(d)<=3.5?'#ffb45c':'#ff5d6c');return `<b class="delta" style="color:${col}">${d>=0?'+':'−'}${Math.abs(d).toFixed(1)}</b>`;};
+  const dCv=(p,a)=>{const d=a-p,col=Math.abs(d)<=1?'#5fd6a0':(Math.abs(d)<=2?'#ffb45c':'#ff5d6c');return `<b class="delta" style="color:${col}">${d>=0?'+':'−'}${Math.abs(d).toFixed(1)}</b>`;};
+  $('valFrost').innerHTML=`<div class="vh">Nachtvorst · afgelopen nacht</div>`+
+    (fp?`<div class="vrow"><span>Modelraming (avond)</span><b>${nl(fp.tmin,1)} °C</b></div>`+
+        (nightDone&&realMin!=null?`<div class="vrow"><span>Werkelijk minimum</span><b>${nl(realMin,1)} °C</b></div><div class="vrow"><span>Afwijking</span>${dC(fp.tmin,realMin)} °C</div>`
+          :`<div class="vmuted">Werkelijk minimum nog niet compleet (na 09:00).</div>`)
+      :`<div class="vmuted">Onvoldoende gegevens voor deze nacht.</div>`);
+  $('valVd').innerHTML=`<div class="vh">VD-piek · vandaag</div>`+
+    (vp!=null?`<div class="vrow"><span>Modelraming (08:00)</span><b>${nl(vp,1)} g/m³</b></div>`+
+        (vdDone&&realVd!=null?`<div class="vrow"><span>Werkelijke piek</span><b>${nl(realVd,1)} g/m³</b></div><div class="vrow"><span>Afwijking</span>${dCv(vp,realVd)} g/m³</div>`
+          :`<div class="vmuted">Werkelijke piek nog niet compleet (na 18:00).</div>`)
+      :`<div class="vmuted">Onvoldoende gegevens voor deze dag.</div>`);
+}
+
+/* ===== navigatie ===== */
+function setView(v){
+  document.body.dataset.view=v;
+  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewToday').classList.toggle('on',v==="today");
+  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabToday').classList.toggle('on',v==="today");
+  if(FC.hourly){relabelDays();}
+  if(v==="today"){ renderToday($('daySel').value || new Date().toLocaleDateString('sv-SE')); }
+  else if(FC.hourly){ applyCurrentView(); }
+}
+$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabToday').onclick=()=>setView("today");
+$('refresh').onclick=fetchForecast;
+$('daySel').onchange=applyCurrentView;
+$('loc').addEventListener('keydown',e=>{if(e.key==="Enter")fetchForecast();});
+document.querySelectorAll('#viewFrost input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('f_af').classList.add('hidden');predictFrost();}));
+document.querySelectorAll('#viewVd input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('v_af').classList.add('hidden');predictVd();}));
+$('f_d').addEventListener('input',predictFrost); $('v_d').addEventListener('input',predictVd);
+
+(function(){
+  const y=new Date().getFullYear();
+  $('f_d').value=new Date(y,3,15).toISOString().slice(0,10);
+  $('v_d').value=new Date(y,5,15).toISOString().slice(0,10);
+  predictFrost(); setVdMode("fc"); setView("frost");
+  buildThermoTicks();
+  fetchForecast();
+})();
+</script>
+</body>
+</html>
