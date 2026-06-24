@@ -1,0 +1,103 @@
+"""Vorstmodel: voorspel nachtelijke min-temp + vorstkans uit avondcondities."""
+import pandas as pd, numpy as np, json
+from sklearn.ensemble import HistGradientBoostingRegressor, HistGradientBoostingClassifier
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, roc_auc_score
+
+d = pd.read_parquet("../data/weer_clean.parquet").set_index("dt").sort_index()
+# Uurgemiddelden (robuust tegen ontbrekende kwartieren)
+h = d[["temp","hum","dewpt","wind","rain"]].resample("1h").mean()
+h["hour"] = h.index.hour
+
+EVE = 19  # avond-afkapuur
+def night_id(ts):
+    # nacht hoort bij de datum van de avond (>=12u dag D; <12u -> vorige dag)
+    return (ts.normalize() if ts.hour >= 12 else ts.normalize() - pd.Timedelta(days=1))
+
+h["night"] = [night_id(t) for t in h.index]
+# Nachtvenster = [D 18:00, D+1 09:00)
+h["in_night"] = ((h.index.hour >= 18) | (h.index.hour < 9))
+
+rows = []
+for nid, g in h.groupby("night"):
+    night = g[g["in_night"]]
+    eve = g[(g.index.normalize()==nid) & (g["hour"]==EVE)]
+    if eve.empty or night["temp"].notna().sum() < 6:  # genoeg metingen vereist
+        continue
+    e = eve.iloc[0]
+    tmin = night["temp"].min()
+    if pd.isna(tmin) or pd.isna(e["temp"]) or pd.isna(e["dewpt"]):
+        continue
+    # dag-context (dag D, 09-18u)
+    day = g[(g.index.normalize()==nid) & (g["hour"]>=9) & (g["hour"]<=18)]
+    rows.append({
+        "night": nid,
+        "t_eve": e["temp"], "td_eve": e["dewpt"], "rh_eve": e["hum"], "wind_eve": e["wind"],
+        "dewdep_eve": e["temp"]-e["dewpt"],            # dauwpuntsdepressie
+        "tmax_day": day["temp"].max(), "rain_day": g[g.index.normalize()==nid]["rain"].sum(),
+        "doy": nid.dayofyear, "month": nid.month,
+        "tmin_night": tmin,
+    })
+
+nd = pd.DataFrame(rows).dropna(subset=["t_eve","td_eve","wind_eve","tmax_day"]).reset_index(drop=True)
+nd["doy_sin"] = np.sin(2*np.pi*nd.doy/365); nd["doy_cos"] = np.cos(2*np.pi*nd.doy/365)
+nd["tmin_prev"] = nd["tmin_night"].shift(1)          # gisteren bekend bij voorspelling
+nd = nd.dropna(subset=["tmin_prev"]).reset_index(drop=True)
+nd["frost"] = (nd.tmin_night <= 0).astype(int)
+
+print(f"Bruikbare nachten: {len(nd)}  | vorstnachten (Tmin<=0): {nd.frost.sum()} ({nd.frost.mean()*100:.1f}%)")
+print("Per jaar:", nd.groupby(nd.night.dt.year).size().to_dict())
+
+FEATS = ["t_eve","td_eve","rh_eve","wind_eve","dewdep_eve","tmax_day","rain_day","tmin_prev","doy_sin","doy_cos"]
+# Tijd-gebaseerde split: train t/m 2024, test = 2025 (echt out-of-sample)
+tr = nd[nd.night.dt.year <= 2024]; te = nd[nd.night.dt.year == 2025]
+Xtr, ytr = tr[FEATS], tr.tmin_night; Xte, yte = te[FEATS], te.tmin_night
+print(f"\nTrain nachten: {len(tr)}  |  Test (2025): {len(te)}")
+
+def report(name, pred):
+    mae = mean_absolute_error(yte, pred); rmse = mean_squared_error(yte, pred)**0.5
+    # vorst-classificatie afgeleid uit voorspelde Tmin <= 0
+    pf = (pred <= 0).astype(int); af = (yte.values <= 0).astype(int)
+    tp = int(((pf==1)&(af==1)).sum()); fp=int(((pf==1)&(af==0)).sum())
+    fn = int(((pf==0)&(af==1)).sum()); tn=int(((pf==0)&(af==0)).sum())
+    rec = tp/(tp+fn) if tp+fn else 0; prec = tp/(tp+fp) if tp+fp else 0
+    print(f"{name:32s} MAE={mae:.2f}C RMSE={rmse:.2f}C | vorst recall={rec:.0%} precision={prec:.0%} (TP{tp} FP{fp} FN{fn} TN{tn})")
+    return dict(mae=mae,rmse=rmse,recall=rec,precision=prec)
+
+print("\n=== Voorspelling nachtelijke minimumtemperatuur (test 2025) ===")
+report("Baseline: Tmin = avondtemp", Xte.t_eve.values)
+report("Baseline: Tmin = avond-dauwpunt", Xte.td_eve.values)
+lin = LinearRegression().fit(Xtr, ytr); report("Lineaire regressie", lin.predict(Xte))
+gbr = HistGradientBoostingRegressor(max_iter=400, learning_rate=0.05, max_depth=4,
+                                    l2_regularization=1.0, random_state=0).fit(Xtr, ytr)
+m_gbr = report("Gradient boosting (Tmin)", gbr.predict(Xte))
+
+# Aparte vorst-kans classifier (gekalibreerde kans)
+clf = HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, max_depth=4,
+                                     l2_regularization=1.0, random_state=0).fit(Xtr, tr.frost)
+p = clf.predict_proba(Xte)[:,1]
+auc = roc_auc_score(te.frost, p)
+print(f"\nVorst-kans classifier: ROC-AUC = {auc:.3f}")
+for thr in (0.3,0.5):
+    pf=(p>=thr).astype(int); af=te.frost.values
+    tp=int(((pf==1)&(af==1)).sum());fp=int(((pf==1)&(af==0)).sum());fn=int(((pf==0)&(af==1)).sum())
+    rec=tp/(tp+fn) if tp+fn else 0; prec=tp/(tp+fp) if tp+fp else 0
+    print(f"  drempel {thr}: recall={rec:.0%} precision={prec:.0%}")
+
+# Voorjaarsvorst (mrt-mei) apart: dat is wat fruittelers raakt
+spring = te[te.month.isin([3,4,5])]
+if len(spring):
+    sp = gbr.predict(spring[FEATS])
+    print(f"\nVoorjaar 2025 (mrt-mei, {len(spring)} nachten): MAE={mean_absolute_error(spring.tmin_night, sp):.2f}C")
+
+# Feature-belang via permutatie (snel, op test)
+from sklearn.inspection import permutation_importance
+imp = permutation_importance(gbr, Xte, yte, n_repeats=8, random_state=0, scoring="neg_mean_absolute_error")
+order = np.argsort(imp.importances_mean)[::-1]
+print("\nBelangrijkste voorspellers (Tmin):")
+for i in order[:6]:
+    print(f"  {FEATS[i]:12s} {imp.importances_mean[i]:.3f}")
+
+nd.to_parquet("../data/nights.parquet")
+import joblib; joblib.dump({"gbr":gbr,"clf":clf,"lin":lin,"feats":FEATS}, "../models/frost_sklearn.joblib")
+print("\nModellen opgeslagen.")
