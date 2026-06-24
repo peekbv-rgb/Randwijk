@@ -1,19 +1,17 @@
 # Render Blueprint — statische site "Agrometeo Randwijk"
 # Specificatie: https://render.com/docs/blueprint-spec
 #
-# Dit is een puur statische site: index.html met de modellen erin gebakken,
-# geen backend en geen buildstap. Open-Meteo wordt rechtstreeks vanuit de
-# browser opgehaald.
+# Puur statische site: index.html met de modellen erin gebakken, geen backend
+# en geen buildstap. Open-Meteo wordt rechtstreeks uit de browser opgehaald.
 
 services:
   - type: web
     name: randwijk-agrometeo
-    runtime: static            # statische site (oudere syntax: env: static)
+    env: static                # statische site (breed ondersteund)
     buildCommand: "echo geen build nodig"
-    staticPublishPath: .       # index.html staat in de repo-root
+    staticPublishPath: .       # map waarin index.html staat (repo-root)
     pullRequestPreviewsEnabled: false
     headers:
-      # Voorkom dat een oude versie van het dashboard blijft hangen na een push
       - path: /*
         name: Cache-Control
         value: "no-cache"
