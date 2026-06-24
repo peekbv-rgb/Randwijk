@@ -24,6 +24,11 @@
     --bg:#0d1117; --bg2:#141a24; --panel:#161d29; --line:#293243;
     --accent:#7c89ff; --field:#0d1320; --bgA:#1c2740; --bgB:#1a2030;
   }
+  body[data-view="leaf"]{
+    --ink:#e9f5ea; --mut:#8fae93; --shadow:rgba(0,0,0,.45);
+    --bg:#0a1410; --bg2:#10201a; --panel:#142a20; --line:#234436;
+    --accent:#67d29a; --field:#0a1610; --bgA:#163826; --bgB:#0f2a22;
+  }
   *{box-sizing:border-box} html,body{margin:0}
   body{
     background:
@@ -131,6 +136,7 @@
     <div class="seg">
       <button id="tabFrost" class="on">Nachtvorst</button>
       <button id="tabVd">VD-piek</button>
+      <button id="tabLeaf">Bladnat</button>
       <button id="tabToday">Klopt het?</button>
     </div>
   </div>
@@ -166,6 +172,10 @@
           <input id="f_tprev" type="range" min="-15" max="22" step="0.5" value="5"></div>
         <div class="field"><label for="f_rain">Neerslag vandaag <b id="f_rainV">0 mm</b></label>
           <input id="f_rain" type="range" min="0" max="40" step="0.5" value="0"></div>
+        <div class="field"><label for="f_wd">Windrichting <b id="f_wdV">— </b></label>
+          <input id="f_wd" type="range" min="0" max="360" step="5" value="180"></div>
+        <div class="field"><label for="f_rr">Regenintensiteit <b id="f_rrV">0,0 mm/u</b></label>
+          <input id="f_rr" type="range" min="0" max="20" step="0.2" value="0"></div>
         <div class="field"><label for="f_d">Datum (seizoen)</label><input id="f_d" type="date"></div>
       </section>
       <section class="card">
@@ -199,7 +209,7 @@
       </div>
     </section>
     <footer>
-      <div style="margin-bottom:8px"><span class="pill">MAE ≈ 1,9 °C</span><span class="pill">ROC-AUC 0,99</span><span class="pill">Open-Meteo</span></div>
+      <div style="margin-bottom:8px"><span class="pill">MAE ≈ 1,9 °C</span><span class="pill">ROC-AUC 0,98</span><span class="pill">Open-Meteo</span></div>
       Schat <em>uitstralingsvorst</em> op stationshoogte; geen vervanging voor een officiële waarschuwing,
       en kent geen aanvoer van koude lucht of bewolkingsverandering in de nacht. In de bloeiperiode: aan de veilige kant blijven.
     </footer>
@@ -228,6 +238,10 @@
           <div class="hint">Uit het weersbericht.</div></div>
         <div class="field"><label for="v_prev">VD-piek gisteren <b id="v_prevV">5,0 g/m³</b></label>
           <input id="v_prev" type="range" min="0" max="25" step="0.5" value="5"></div>
+        <div class="field"><label for="v_wd">Windrichting <b id="v_wdV">— </b></label>
+          <input id="v_wd" type="range" min="0" max="360" step="5" value="180"></div>
+        <div class="field"><label for="v_rr">Regenintensiteit <b id="v_rrV">0,0 mm/u</b></label>
+          <input id="v_rr" type="range" min="0" max="20" step="0.2" value="0"></div>
         <div class="field"><label for="v_d">Datum (seizoen)</label><input id="v_d" type="date"></div>
       </section>
       <section class="card">
@@ -266,6 +280,57 @@
   </div>
 
   <!-- ============ VALIDATIE ============ -->
+  <!-- ============ BLADNAT ============ -->
+  <div class="view" id="viewLeaf">
+    <header>
+      <h1 id="l_h1">Bladnat &amp; schurftdruk</h1>
+      <p>Bladnatheid wordt geschat uit het weerbericht: nat bij <b>RV ≥ 90 %</b> of neerslag
+         (komt ~81 % overeen met de bladnat-sensor in Randwijk). De langste aaneengesloten natperiode
+         en de temperatuur daarbij bepalen via de Mills-tabel het infectierisico voor appelschurft.</p>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2>Langste natperiode</h2>
+        <div class="big"><span id="l_spell">0</span><small> u nat</small></div>
+        <div class="sub" id="l_sub">geen natperiode · totaal — nat-uren</div>
+        <div style="margin-top:10px">
+          <span class="pill" id="l_totPill">— nat-uren</span>
+          <span class="pill" id="l_nowPill">—</span>
+          <span class="pill">RV ≥ 90 % of regen</span></div>
+      </section>
+      <section class="card">
+        <h2>Schurftrisico · Mills</h2>
+        <div class="big" style="font-size:38px"><span id="l_risk">—</span></div>
+        <div class="sub" id="l_riskSub">indicatief — gebaseerd op de Mills-tabel</div>
+        <div class="status" id="l_status"><span class="dot" id="l_dot"></span><div id="l_statusTxt"></div></div>
+      </section>
+    </div>
+    <section class="card chartcard">
+      <h2>Bladnat over de dag</h2>
+      <div id="l_chart"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#67d29a"></i>RV (%)</span>
+        <span><i class="cband" style="background:#67d29a"></i>nat (RV ≥ 90 % of regen)</span>
+        <span><i class="curve dashed" style="border-top-color:#a7c2ff"></i>90 %-grens</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Mills-kaart · schurftinfectie (natduur × temperatuur)</h2>
+      <div id="l_map"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#67d29a"></i>infectiedrempel (Mills)</span>
+        <span><i class="cband" style="background:#ff5d6c"></i>infectiegebied</span>
+        <span><i class="fdot" style="--c:#4fd0e0"></i>verwachte natperiode</span>
+      </div>
+    </section>
+    <footer>
+      Schurftrisico is een <b>indicatieve</b> benadering op basis van de (herziene) Mills-tabel voor
+      appelschurft (Venturia inaequalis). Gebruik het als signaal, niet als vervanging van een
+      officiële schurftwaarschuwing (bijv. RIMpro of de regionale waarschuwingsdienst). Bladnat is
+      een schatting uit RV en neerslag, geen directe meting.
+    </footer>
+  </div>
+
   <div class="view" id="viewToday">
     <header>
       <h1>Klopt de voorspelling?</h1>
@@ -298,20 +363,14 @@
 
 <script>
 /* ===== modellen ===== */
-const FROST = {
- mean:[13.985337802313355,9.750510286613634,77.85331230283911,2.835193217665615,4.234827515699721,16.583688222923236,0.31633083596214506,8.25095294426919,0.04228713774519254,-0.09313058051258077],
- scale:[7.516968120182253,6.258690379711778,15.887232391656665,3.3160620991107876,3.675519329952826,7.6185668308279535,0.8106176377459678,5.621161016271389,0.7275218531075218,0.6784176045812094],
- lin:[2.9109689204626252,3.3147702896144158,0.47764832522332223,0.21417422726478358,0.30894672275041646,-1.2298811003597254,0.07556395796795383,0.6654579436135554,-0.03905612223457271,0.27847004553000965],
- lin_int:8.253023133543639,
- log:[-1.990331637110022,-2.625100041623802,0.16864203619583304,-0.2315125081407641,0.3995160356195296,0.09805311601034976,-0.48050861555269697,-0.21863842922361568,0.4941203735229564,-0.09284006517523827],
- log_int:-7.063002498881626 };
+const FROST={mean:[13.914891900613101,9.427088439932044,76.73862536302033,3.4801790900290417,4.487803460681057,16.565964827363665,1.4010164569215877,8.211600516295578,-0.14916987306322166,-0.08030163767266078,0.3035575992255567,0.15956458529038134,-0.11150622557997286],scale:[7.428060402273649,6.071721284262251,16.441970291742873,3.3545748756279004,3.8288178877221113,7.496846122898356,3.450004367846644,5.4715303541027,0.6990132011414234,0.6647342612097206,1.9515247224480874,0.688748565219322,0.6983773469166523],lin:[2.0912265807192534,2.7431993040594573,0.06446726149146599,0.19422553713221202,-0.29308895798018797,0.03126831463737739,0.011799667543097754,0.4794175755225542,0.25863302683279765,-0.7097903177855183,-0.02764209888702224,-0.1641708645794053,-0.09942216654594326],lin_int:8.214141658599548,log:[-1.749983106448669,-2.329934751096692,0.0539767682673683,-0.0736316375151323,0.29976202451344336,-0.5084476392873309,-0.5498453514882202,-0.2171963447507823,-0.03382353684680493,0.27869218145561603,-0.3652831749745939,0.49570496031322303,-0.098360579378577],log_int:-7.313721270402632};
 const VD = {
- fc:{mean:[10.18080487159121,91.19102462271644,8.750872431605451,2.6176926131850675,0.9290241569687562,16.623398199629335,5.24566971560245,0.04337979140680323,-0.09653340884272281],
-  scale:[6.082417610976241,7.5637380902910705,6.027042312655852,3.0698470158281186,0.9993626233572439,7.604931077575362,4.437426499241767,0.7282947114580864,0.6770423235935021],
-  coef:[-16.406359622262446,-2.0828402718946997,13.325015361534946,0.2279514592430565,2.0807381066810673,5.218659321500105,0.8393105975200839,0.3430784318857837,0.1158527280709851], int:5.2454654101468865},
- morn:{mean:[10.18080487159121,91.19102462271644,8.750872431605451,2.6176926131850675,0.9290241569687562,1.4299324399857596,5.24566971560245,0.04337979140680323,-0.09653340884272281],
-  scale:[6.082417610976241,7.5637380902910705,6.027042312655852,3.0698470158281186,0.9993626233572439,1.3378711176693574,4.437426499241767,0.7282947114580864,0.6770423235935021],
-  coef:[-0.1697830637608332,-0.7833306864461014,0.03632280373975153,-0.32643284703553077,1.161732751778952,-0.9355240243907337,2.2167565181443125,-0.023473463955022412,-1.0596013011621168], int:5.245465410146885}
+ fc:{mean:[10.23243987975952,90.04133266533066,8.607302630262677,3.3022795591182366,1.0545755568011361,16.071033734134936,5.1084474456594,0.0060964570915774795,-0.2324773004797434,0.17843186372745493,0.17259932178343973,-0.08909897209541211],
+  scale:[5.890302875899716,7.858920587023474,5.805802223804871,3.102877073179912,1.0549794467757645,7.506619281388493,4.433359909517061,0.6575897901488574,0.6897384284953393,1.0038360146734346,0.6922262805663831,0.6950493678758859],
+  coef:[-15.306135640092116,-1.5460758113230604,11.562815449354234,0.22966614643264827,2.701006983666283,5.598992921659999,0.6092600940896985,-0.18370749630095898,0.1908700117783162,0.04254359341961842,0.12287310896003686,0.14821384500960788], int:5.108189709618759},
+ morn:{mean:[10.23243987975952,90.04133266533066,8.607302630262677,3.3022795591182366,1.0545755568011361,1.6251372494968417,5.1084474456594,0.0060964570915774795,-0.2324773004797434,0.17843186372745493,0.17259932178343973,-0.08909897209541211],
+  scale:[5.890302875899716,7.858920587023474,5.805802223804871,3.102877073179912,1.0549794467757645,1.4026863636544673,4.433359909517061,0.6575897901488574,0.6897384284953393,1.0038360146734346,0.6922262805663831,0.6950493678758859],
+  coef:[-0.30322768715499765,-2.114539857902024,0.3619951928007707,-0.2702279153511941,2.0910174421854166,-2.771664082440963,1.5484625234525922,0.5002714988432194,0.21305286639381504,-0.01294320322966034,0.1704472233125108,-1.0810860372322944], int:5.108189709618763}
 };
 const DEFAULT_PLACE = {name:"Randwijk", lat:51.937, lon:5.719};
 const FC = {hourly:null, daily:null, place:DEFAULT_PLACE};
@@ -344,14 +403,15 @@ function showFrost(tmin, prob, sub){
 }
 function predictFrost(){
   const T=+$('f_t').value,RH=+$('f_rh').value,W=+$('f_w').value,TMAX=+$('f_tmax').value,
-        TPREV=+$('f_tprev').value,RAIN=+$('f_rain').value,doy=doyOf($('f_d'));
-  const td=dewpoint(T,RH);
-  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,Math.sin(2*Math.PI*doy/365),Math.cos(2*Math.PI*doy/365)];
+        TPREV=+$('f_tprev').value,RAIN=+$('f_rain').value,WD=+$('f_wd').value,RR=+$('f_rr').value,doy=doyOf($('f_d'));
+  const td=dewpoint(T,RH),wd=wdSC(WD);
+  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,wd.s,wd.c,RR,Math.sin(2*Math.PI*doy/365),Math.cos(2*Math.PI*doy/365)];
   let tmin=FROST.lin_int,logit=FROST.log_int;
   for(let i=0;i<x.length;i++){const zi=(x[i]-FROST.mean[i])/FROST.scale[i];tmin+=FROST.lin[i]*zi;logit+=FROST.log[i]*zi;}
   showFrost(tmin,1/(1+Math.exp(-logit)),'verwachte laagste temperatuur · dauwpunt '+nl(td)+' °C');
   $('f_tV').textContent=nl(T)+' °C';$('f_rhV').textContent=RH+' %';$('f_wV').textContent=W+' km/h';
   $('f_tmaxV').textContent=nl(TMAX)+' °C';$('f_tprevV').textContent=nl(TPREV)+' °C';$('f_rainV').textContent=nl(RAIN)+' mm';
+  $('f_wdV').textContent=cardinal(WD)+' ('+Math.round(WD)+'°)';$('f_rrV').textContent=nl(RR,1)+' mm/u';
 }
 let VMODE="fc";
 function showVd(vd, sub){
@@ -369,14 +429,15 @@ function showVd(vd, sub){
 }
 function predictVd(){
   const T=+$('v_t').value,RH=+$('v_rh').value,W=+$('v_w').value,TMAX=+$('v_tmax').value,
-        VPREV=+$('v_prev').value,doy=doyOf($('v_d'));
-  const td=dewpoint(T,RH),vm=vdGm3(T,RH),dd=T-td;
+        VPREV=+$('v_prev').value,WD=+$('v_wd').value,RR=+$('v_rr').value,doy=doyOf($('v_d'));
+  const td=dewpoint(T,RH),vm=vdGm3(T,RH),dd=T-td,wd=wdSC(WD);
   const s=Math.sin(2*Math.PI*doy/365),c=Math.cos(2*Math.PI*doy/365),M=VD[VMODE];
-  const vals=VMODE==="fc"?[T,RH,td,W,vm,TMAX,VPREV,s,c]:[T,RH,td,W,vm,dd,VPREV,s,c];
+  const vals=VMODE==="fc"?[T,RH,td,W,vm,TMAX,VPREV,wd.s,wd.c,RR,s,c]:[T,RH,td,W,vm,dd,VPREV,wd.s,wd.c,RR,s,c];
   let vd=M.int; for(let i=0;i<vals.length;i++) vd+=M.coef[i]*((vals[i]-M.mean[i])/M.scale[i]);
   showVd(Math.max(0,vd),'wat-als · dauwpunt '+nl(td)+' °C · ochtend-VD '+nl(vm,1)+' g/m³');
   $('v_tV').textContent=nl(T)+' °C';$('v_rhV').textContent=RH+' %';$('v_wV').textContent=W+' km/h';
   $('v_tmaxV').textContent=nl(TMAX)+' °C';$('v_prevV').textContent=nl(VPREV,1)+' g/m³';
+  $('v_wdV').textContent=cardinal(WD)+' ('+Math.round(WD)+'°)';$('v_rrV').textContent=nl(RR,1)+' mm/u';
 }
 function setVdMode(m){VMODE=m;} // toggle verwijderd; what-if gebruikt altijd het fc-model
 
@@ -403,7 +464,7 @@ async function fetchForecast(){
       if(gj.results&&gj.results[0]){const r=gj.results[0];place={name:r.name,lat:r.latitude,lon:r.longitude};}
     }
     const url="https://api.open-meteo.com/v1/forecast?latitude="+place.lat+"&longitude="+place.lon+
-      "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,precipitation,vapour_pressure_deficit"+
+      "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,precipitation,vapour_pressure_deficit"+
       "&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FAmsterdam&past_days=3&forecast_days=3";
     const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status);
     const j=await r.json();
@@ -436,11 +497,12 @@ function applyCurrentView(){
   if(!FC.hourly) return;
   const D=$('daySel').value; if(!D) return;
   const v=document.body.dataset.view;
-  if(v==="frost") applyFrost(D); else if(v==="vd") applyVd(D); else renderToday(D);
+  if(v==="frost") applyFrost(D); else if(v==="vd") applyVd(D); else if(v==="leaf") applyLeaf(D); else renderToday(D);
 }
 function applyFrost(D){
   const i=idxAt(D,19), h=FC.hourly, di=FC.daily.time.indexOf(D);
-  if(i>=0){ setS('f_t',h.temperature_2m[i]); setS('f_rh',h.relative_humidity_2m[i]); setS('f_w',h.wind_speed_10m[i]); }
+  if(i>=0){ setS('f_t',h.temperature_2m[i]); setS('f_rh',h.relative_humidity_2m[i]); setS('f_w',h.wind_speed_10m[i]);
+            if(h.wind_direction_10m) setS('f_wd',h.wind_direction_10m[i]); if(h.precipitation) setS('f_rr',h.precipitation[i]); }
   if(di>=0){ setS('f_tmax',FC.daily.temperature_2m_max[di]); setS('f_rain',FC.daily.precipitation_sum[di]); }
   setS('f_tprev',rangeAgg(prevDate(D),18,D,9,h.temperature_2m,"min"));
   $('f_d').value=D; $('f_af').classList.remove('hidden');
@@ -451,7 +513,8 @@ function applyFrost(D){
 }
 function applyVd(D){
   const i=idxAt(D,8), h=FC.hourly, di=FC.daily.time.indexOf(D);
-  if(i>=0){ setS('v_t',h.temperature_2m[i]); setS('v_rh',h.relative_humidity_2m[i]); setS('v_w',h.wind_speed_10m[i]); }
+  if(i>=0){ setS('v_t',h.temperature_2m[i]); setS('v_rh',h.relative_humidity_2m[i]); setS('v_w',h.wind_speed_10m[i]);
+            if(h.wind_direction_10m) setS('v_wd',h.wind_direction_10m[i]); if(h.precipitation) setS('v_rr',h.precipitation[i]); }
   if(di>=0){ setS('v_tmax',FC.daily.temperature_2m_max[di]); }
   setS('v_prev',rangeAgg(prevDate(D),10,prevDate(D),18,h.vd_gm3,"max"));
   $('v_d').value=D; $('v_af').classList.remove('hidden');
@@ -560,14 +623,18 @@ function renderVdChart(D){
 function doyD(D){const dd=new Date(D+"T12:00:00");return Math.round((dd-new Date(dd.getFullYear(),0,0))/864e5);}
 function localNowTs(){const n=new Date();return n.toLocaleDateString('sv-SE')+"T"+pad2(n.getHours())+":00";}
 
+function wdSC(deg){ if(deg==null||isNaN(deg)) return {s:0,c:0}; const r=deg*Math.PI/180; return {s:Math.sin(r),c:Math.cos(r)}; }
+const CARD=['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
+const cardinal=deg=>(deg==null||isNaN(deg))?'—':CARD[Math.round(((deg%360)+360)%360/22.5)%16];
 function frostPredict(nightStart){ // nacht [nightStart 18:00 -> +1 09:00]
   const h=FC.hourly, i=idxAt(nightStart,19), di=FC.daily.time.indexOf(nightStart);
   if(i<0||h.temperature_2m[i]==null||h.relative_humidity_2m[i]==null) return null;
   const T=h.temperature_2m[i],RH=h.relative_humidity_2m[i],W=h.wind_speed_10m[i]==null?3:h.wind_speed_10m[i];
   const TMAX=di>=0?FC.daily.temperature_2m_max[di]:T, RAIN=di>=0?FC.daily.precipitation_sum[di]:0;
   let TPREV=rangeAgg(prevDate(nightStart),18,nightStart,9,h.temperature_2m,"min"); if(TPREV==null)TPREV=T;
+  const wd=wdSC(h.wind_direction_10m?h.wind_direction_10m[i]:null), RR=(h.precipitation?h.precipitation[i]:0)||0;
   const td=dewpoint(T,RH),doy=doyD(nightStart),s=Math.sin(2*Math.PI*doy/365),cc=Math.cos(2*Math.PI*doy/365);
-  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,s,cc];
+  const x=[T,td,RH,W,T-td,TMAX,RAIN,TPREV,wd.s,wd.c,RR,s,cc];
   let tmin=FROST.lin_int,logit=FROST.log_int;
   for(let k=0;k<x.length;k++){const zi=(x[k]-FROST.mean[k])/FROST.scale[k];tmin+=FROST.lin[k]*zi;logit+=FROST.log[k]*zi;}
   return {tmin,prob:1/(1+Math.exp(-logit))};
@@ -578,9 +645,10 @@ function vdPredict(D){ // VD-piek dag D (10-18u), g/m3
   const T=h.temperature_2m[i],RH=h.relative_humidity_2m[i],W=h.wind_speed_10m[i]==null?3:h.wind_speed_10m[i];
   const TMAX=di>=0?FC.daily.temperature_2m_max[di]:T;
   let VPREV=rangeAgg(prevDate(D),10,prevDate(D),18,h.vd_gm3,"max"); if(VPREV==null)VPREV=5;
+  const wd=wdSC(h.wind_direction_10m?h.wind_direction_10m[i]:null), RR=(h.precipitation?h.precipitation[i]:0)||0;
   const td=dewpoint(T,RH),vm=vdGm3(T,RH),doy=doyD(D);
   const s=Math.sin(2*Math.PI*doy/365),cc=Math.cos(2*Math.PI*doy/365),M=VD.fc;
-  const vals=[T,RH,td,W,vm,TMAX,VPREV,s,cc];
+  const vals=[T,RH,td,W,vm,TMAX,VPREV,wd.s,wd.c,RR,s,cc];
   let vd=M.int; for(let k=0;k<vals.length;k++) vd+=M.coef[k]*((vals[k]-M.mean[k])/M.scale[k]);
   return Math.max(0,vd);
 }
@@ -670,15 +738,99 @@ function renderToday(D){
 }
 
 /* ===== navigatie ===== */
+/* ===== Bladnat & schurftdruk (Mills) ===== */
+function millsHours(T){ // indicatief: min. aaneengesloten natte uren voor (lichte) appelschurft-infectie bij gem. temp
+  const pts=[[1,48],[2,40],[4,30],[6,22],[8,16],[10,13],[12,11],[14,10],[16,9],[18,9],[20,9],[22,9],[24,9],[25,9.5],[26,11],[27,15]];
+  if(T<1||T>27) return Infinity;
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];
+    if(T>=a[0]&&T<=b[0]){const f=(T-a[0])/(b[0]-a[0]);return a[1]+f*(b[1]-a[1]);}}
+  return pts[pts.length-1][1];
+}
+function classifyScab(hours,temp){
+  if(temp==null||hours<=0) return {cls:'Geen',col:'var(--ok)',head:'Geen natperiode',body:'Geen aaneengesloten bladnat verwacht — geen schurft-infectierisico.'};
+  const R=millsHours(temp);
+  if(!isFinite(R)) return {cls:'Geen',col:'var(--ok)',head:'Geen infectierisico',body:'Te koud of te warm voor schurftinfectie bij deze natperiode.'};
+  const ratio=hours/R, Rr=Math.round(R);
+  if(ratio<1) return {cls:'Geen',col:'var(--ok)',head:'Geen infectie',body:`Natperiode (${hours} u) korter dan de drempel (~${Rr} u bij ${nl(temp)} °C). Geen schurftinfectie verwacht.`};
+  if(ratio<1.5) return {cls:'Licht',col:'var(--warm)',head:'Lichte infectie',body:`Natperiode overschrijdt de drempel (~${Rr} u bij ${nl(temp)} °C). Lichte schurftinfectie mogelijk.`};
+  if(ratio<2) return {cls:'Matig',col:'#ff9636',head:'Matige infectie',body:`Ruim boven de drempel (~${Rr} u). Matige schurftinfectie waarschijnlijk — bescherming overwegen.`};
+  return {cls:'Zwaar',col:'var(--danger)',head:'Zware infectie',body:`Langdurig nat (${hours} u) bij gunstige temperatuur. Hoog schurft-infectierisico — bescherming aanbevolen.`};
+}
+function computeLeaf(D){
+  const h=FC.hourly, ND=nextDate(D), today=new Date().toLocaleDateString('sv-SE');
+  const wetAt=i=>{ if(i<0) return null; const rh=h.relative_humidity_2m[i], rn=h.precipitation?h.precipitation[i]:0;
+    return rh==null?null:((rh>=90)||((rn||0)>0)); };
+  const seq=[];
+  for(let k=0;k<24;k++){const i=idxAt(D,k); seq.push({wet:wetAt(i),temp:i>=0?h.temperature_2m[i]:null});}
+  for(let k=0;k<=12;k++){const i=idxAt(ND,k); seq.push({wet:wetAt(i),temp:i>=0?h.temperature_2m[i]:null});}
+  let tot=0; for(let k=0;k<24;k++){ if(seq[k].wet) tot++; }
+  let best=0,bestTemps=[],cur=0,curTemps=[];
+  for(const s of seq){ if(s.wet){cur++; if(s.temp!=null)curTemps.push(s.temp);} else {
+    if(cur>best){best=cur;bestTemps=curTemps;} cur=0;curTemps=[]; } }
+  if(cur>best){best=cur;bestTemps=curTemps;}
+  const spellTemp=bestTemps.length?bestTemps.reduce((a,b)=>a+b,0)/bestTemps.length:null;
+  let nowWet=null; if(D===today){nowWet=wetAt(idxAt(D,new Date().getHours()));}
+  return {spell:best, spellTemp, total:tot, nowWet};
+}
+function renderLeafChart(D){
+  const box=$('l_chart'); if(!box) return;
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht — klik op Ververs.</div>';return;}
+  const h=FC.hourly, W=720,H=300,ml=40,mr=14,mt=14,mb=28,pw=W-ml-mr,ph=H-mt-mb;
+  const X=k=>ml+k/23*pw, Y=v=>mt+(1-v/100)*ph;
+  let rh=[],wet=[];
+  for(let k=0;k<24;k++){const i=idxAt(D,k); const v=i>=0?h.relative_humidity_2m[i]:null;
+    const rn=(i>=0&&h.precipitation)?h.precipitation[i]:0; rh.push(v); wet.push(v!=null?((v>=90)||((rn||0)>0)):false);}
+  if(rh.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze dag.</div>';return;}
+  let bands=""; for(let k=0;k<24;k++){ if(wet[k]){const x0=X(Math.max(0,k-0.5)),x1=X(Math.min(23,k+0.5));
+    bands+=`<rect x="${x0.toFixed(1)}" y="${mt}" width="${(x1-x0).toFixed(1)}" height="${ph}" fill="#67d29a" opacity="0.18"/>`;}}
+  let grid="",yl=""; for(let v=0;v<=100;v+=20){const y=Y(v);grid+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;yl+=`<text x="${ml-6}" y="${y+3.5}" text-anchor="end" class="ax">${v}</text>`;}
+  const y90=Y(90), line90=`<line x1="${ml}" y1="${y90}" x2="${ml+pw}" y2="${y90}" stroke="#a7c2ff" stroke-width="1.5" stroke-dasharray="5 4" opacity=".8"/><text x="${ml+pw-2}" y="${y90-5}" text-anchor="end" class="ax" fill="#a7c2ff">90 %</text>`;
+  let xl=""; for(let k=0;k<=24;k+=4){xl+=`<text x="${X(Math.min(k,23))}" y="${H-9}" text-anchor="middle" class="ax">${pad2(k%24)}</text>`;}
+  let d="",started=false; for(let k=0;k<24;k++){ if(rh[k]==null){started=false;continue;} d+=(started?"L":"M")+X(k).toFixed(1)+" "+Y(rh[k]).toFixed(1)+" "; started=true; }
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${bands}${grid}${line90}<path d="${d.trim()}" fill="none" stroke="#67d29a" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+}
+function renderMillsMap(D, spell){
+  const box=$('l_map'); if(!box) return;
+  if(!FC.hourly){box.innerHTML='<div class="chartmsg">Geen weersbericht — klik op Ververs.</div>';return;}
+  const W=720,H=320,ml=42,mr=16,mt=14,mb=30,pw=W-ml-mr,ph=H-mt-mb, T0=0,T1=28,Hmax=42;
+  const X=t=>ml+(t-T0)/(T1-T0)*pw, Y=hh=>mt+(1-Math.min(hh,Hmax)/Hmax)*ph;
+  let d=""; for(let t=1;t<=27;t+=0.5){const R=millsHours(t); if(!isFinite(R)||R>Hmax)continue; d+=(d?"L":"M")+X(t).toFixed(1)+" "+Y(R).toFixed(1)+" ";}
+  let ft=""; for(let t=1;t<=27;t+=0.5){const R=millsHours(t); if(!isFinite(R))continue; ft+=(ft?"L":"M")+X(t).toFixed(1)+" "+Y(Math.min(R,Hmax)).toFixed(1)+" ";}
+  let cl=""; for(let t=27;t>=1;t-=0.5){const R=millsHours(t); if(!isFinite(R))continue; cl+="L"+X(t).toFixed(1)+" "+Y(Hmax).toFixed(1)+" ";}
+  const region= ft?`<path d="${ft}${cl}Z" fill="#ff5d6c" opacity="0.11"/>`:"";
+  let grid="",xl="",yl="";
+  for(let hh=0;hh<=Hmax;hh+=6){const y=Y(hh);grid+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;yl+=`<text x="${ml-6}" y="${y+3.5}" text-anchor="end" class="ax">${hh}</text>`;}
+  for(let t=0;t<=28;t+=4){xl+=`<text x="${X(t)}" y="${H-9}" text-anchor="middle" class="ax">${t}</text>`;}
+  let pt=""; if(spell&&spell.temp!=null&&spell.hours>0){const cx=X(Math.max(T0,Math.min(T1,spell.temp))),cy=Y(spell.hours);
+    const lx=cx>ml+pw-120?cx-9:cx+9, anc=cx>ml+pw-120?'end':'start';
+    pt=`<circle cx="${cx}" cy="${cy}" r="6" fill="none" stroke="#4fd0e0" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="2.5" fill="#4fd0e0"/>`+
+       `<text x="${lx}" y="${cy-5}" text-anchor="${anc}" class="ax" fill="#4fd0e0">${spell.hours} u nat</text>`+
+       `<text x="${lx}" y="${cy+9}" text-anchor="${anc}" class="ax">${nl(spell.temp,1)} °C</text>`;}
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${grid}${region}<path d="${d.trim()}" fill="none" stroke="#67d29a" stroke-width="2"/>${pt}${yl}${xl}<text x="${ml+pw/2}" y="${H-9}" text-anchor="middle" class="ax">gem. temp tijdens nat (°C)</text><text transform="rotate(-90)" x="${-(mt+ph/2)}" y="13" text-anchor="middle" class="ax">aaneengesloten natte uren</text><line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+}
+function applyLeaf(D){
+  if(!FC.hourly) return;
+  const r=computeLeaf(D), sc=classifyScab(r.spell, r.spellTemp);
+  $('l_spell').textContent=r.spell;
+  $('l_sub').textContent=(r.spellTemp!=null?'gem. temp tijdens nat '+nl(r.spellTemp)+' °C':'geen natperiode')+' · totaal '+r.total+' nat-uren';
+  $('l_totPill').textContent=r.total+' nat-uren ('+relDay(D)+')';
+  $('l_nowPill').textContent=r.nowWet==null?'—':(r.nowWet?'nu: nat':'nu: droog');
+  $('l_risk').textContent=sc.cls;
+  $('l_dot').style.background=sc.col; $('l_status').style.borderColor=sc.col;
+  $('l_status').style.background='color-mix(in srgb, '+sc.col+' 12%, transparent)';
+  $('l_statusTxt').innerHTML='<b>'+sc.head+'</b><br>'+sc.body;
+  renderLeafChart(D); renderMillsMap(D,{hours:r.spell,temp:r.spellTemp});
+  $('l_h1').textContent='Bladnat & schurftdruk · '+relDay(D);
+}
 function setView(v){
   document.body.dataset.view=v;
-  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewToday').classList.toggle('on',v==="today");
-  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabToday').classList.toggle('on',v==="today");
+  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewToday').classList.toggle('on',v==="today");
+  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabToday').classList.toggle('on',v==="today");
   if(FC.hourly){relabelDays();}
   if(v==="today"){ renderToday($('daySel').value || new Date().toLocaleDateString('sv-SE')); }
   else if(FC.hourly){ applyCurrentView(); }
 }
-$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabToday').onclick=()=>setView("today");
+$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabToday').onclick=()=>setView("today");
 $('refresh').onclick=fetchForecast;
 $('daySel').onchange=applyCurrentView;
 $('loc').addEventListener('keydown',e=>{if(e.key==="Enter")fetchForecast();});
