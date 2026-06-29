@@ -29,6 +29,11 @@
     --bg:#0a1410; --bg2:#10201a; --panel:#142a20; --line:#234436;
     --accent:#67d29a; --field:#0a1610; --bgA:#163826; --bgB:#0f2a22;
   }
+  body[data-view="cmp"]{
+    --ink:#f6e9f2; --mut:#bda0b6; --shadow:rgba(0,0,0,.5);
+    --bg:#160a14; --bg2:#22101d; --panel:#2a1426; --line:#48243f;
+    --accent:#e879b8; --field:#160a13; --bgA:#3a1030; --bgB:#2a1228;
+  }
   *{box-sizing:border-box} html,body{margin:0}
   body{
     background:
@@ -137,6 +142,7 @@
       <button id="tabFrost" class="on">Nachtvorst</button>
       <button id="tabVd">VD-piek</button>
       <button id="tabLeaf">Bladnat</button>
+      <button id="tabCmp">Toren-effect</button>
       <button id="tabToday">Klopt het?</button>
     </div>
   </div>
@@ -331,6 +337,56 @@
     </footer>
   </div>
 
+  <!-- ============ TOREN-EFFECT (meting vs verwacht) ============ -->
+  <div class="view" id="viewCmp">
+    <header>
+      <h1>Toren-effect · meting vs verwachting</h1>
+      <p>De gemeten waarden van het station op het perceel (Catyra · FRC Randwijk) naast de
+         Open-Meteo-verwachting voor dezelfde plek en periode. Het verschil weerspiegelt het lokale
+         effect van de toren op temperatuur, RV en VD. <b>Proef</b> = perceel met toren,
+         <b>Onbehandeld</b> = referentie, <b>verwacht</b> = Open-Meteo.</p>
+    </header>
+    <section class="card">
+      <h2>Gemiddeld verschil · meting − verwachting</h2>
+      <div class="vrow"><span>Temperatuur</span><b id="cmp_dT">—</b></div>
+      <div class="vrow"><span>Relatieve vochtigheid</span><b id="cmp_dRH">—</b></div>
+      <div class="vrow"><span>Vochtdeficit</span><b id="cmp_dVD">—</b></div>
+      <div class="sub" id="cmp_note" style="margin-top:8px">Proef-perceel t.o.v. Open-Meteo</div>
+    </section>
+    <section class="card chartcard">
+      <h2>Temperatuur (°C)</h2>
+      <div id="cmp_t"><div class="chartmsg">Verwachting ophalen…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht (Open-Meteo)</span>
+        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Relatieve vochtigheid (%)</h2>
+      <div id="cmp_rh"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht</span>
+        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Vochtdeficit (g/m³)</h2>
+      <div id="cmp_vd"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht</span>
+        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <footer>
+      Momentopname (26–29 juni 2026, uurwaarden). De verwachting wordt live bij Open-Meteo opgehaald
+      voor de stationslocatie. Voor een doorlopende vergelijking is een live datafeed van het station
+      nodig; dit is nu een eenmalige export.
+    </footer>
+  </div>
+
   <div class="view" id="viewToday">
     <header>
       <h1>Klopt de voorspelling?</h1>
@@ -374,6 +430,86 @@ const VD = {
 };
 const DEFAULT_PLACE = {name:"Randwijk", lat:51.937, lon:5.719};
 const FC = {hourly:null, daily:null, place:DEFAULT_PLACE};
+/* ===== Meetstation (WolkyTolky, uurwaarden 26-29 jun 2026) ===== */
+const MEAS=[["2026-06-26T10:00",25.7,22.8,45,51],
+["2026-06-26T11:00",25.5,22.7,44,50],
+["2026-06-26T12:00",25.6,23.0,45,51],
+["2026-06-26T13:00",25.8,23.1,46,52],
+["2026-06-26T14:00",26.2,23.6,46,53],
+["2026-06-26T15:00",26.4,23.9,46,52],
+["2026-06-26T16:00",26.6,24.0,45,52],
+["2026-06-26T17:00",27.3,25.2,53,55],
+["2026-06-26T18:00",28.0,26.0,56,59],
+["2026-06-26T19:00",28.5,26.5,56,60],
+["2026-06-26T20:00",28.7,26.7,57,61],
+["2026-06-26T21:00",28.8,26.8,58,62],
+["2026-06-26T22:00",28.8,26.9,59,63],
+["2026-06-26T23:00",28.8,26.9,59,64],
+["2026-06-27T00:00",28.7,26.9,60,64],
+["2026-06-27T01:00",28.6,26.9,60,64],
+["2026-06-27T02:00",28.5,26.8,60,64],
+["2026-06-27T03:00",28.4,26.8,61,65],
+["2026-06-27T04:00",28.2,26.8,60,65],
+["2026-06-27T05:00",28.1,26.7,60,65],
+["2026-06-27T06:00",27.9,26.6,60,65],
+["2026-06-27T07:00",27.8,26.6,60,65],
+["2026-06-27T08:00",27.7,26.5,60,64],
+["2026-06-27T09:00",27.7,26.5,60,64],
+["2026-06-27T10:00",27.8,26.6,60,64],
+["2026-06-27T11:00",28.0,26.7,60,64],
+["2026-06-27T12:00",28.2,26.9,60,64],
+["2026-06-27T13:00",28.5,27.1,60,65],
+["2026-06-27T14:00",28.8,27.3,60,65],
+["2026-06-27T15:00",29.2,27.4,61,66],
+["2026-06-27T16:00",29.4,27.6,62,67],
+["2026-06-27T17:00",29.7,27.8,63,67],
+["2026-06-27T18:00",29.9,27.9,63,68],
+["2026-06-27T19:00",30.1,28.1,63,68],
+["2026-06-27T20:00",30.2,28.1,63,68],
+["2026-06-27T21:00",30.2,28.2,63,68],
+["2026-06-27T22:00",30.1,28.2,63,68],
+["2026-06-27T23:00",30.0,28.1,63,68],
+["2026-06-28T00:00",29.8,28.1,63,68],
+["2026-06-28T01:00",29.7,28.0,63,68],
+["2026-06-28T02:00",29.5,27.9,62,68],
+["2026-06-28T03:00",29.3,27.8,62,67],
+["2026-06-28T04:00",29.1,27.7,62,67],
+["2026-06-28T05:00",28.9,27.6,61,67],
+["2026-06-28T06:00",28.7,27.5,61,67],
+["2026-06-28T07:00",28.5,27.4,61,66],
+["2026-06-28T08:00",28.3,27.3,61,66],
+["2026-06-28T09:00",28.3,27.3,61,66],
+["2026-06-28T10:00",28.3,27.3,61,66],
+["2026-06-28T11:00",28.3,27.3,60,65],
+["2026-06-28T12:00",28.4,27.4,61,65],
+["2026-06-28T13:00",28.6,27.5,61,65],
+["2026-06-28T14:00",28.8,27.6,60,65],
+["2026-06-28T15:00",28.9,27.7,61,65],
+["2026-06-28T16:00",28.9,27.7,61,66],
+["2026-06-28T17:00",28.9,27.7,62,66],
+["2026-06-28T18:00",28.8,27.6,62,66],
+["2026-06-28T19:00",28.8,27.6,62,66],
+["2026-06-28T20:00",28.7,27.5,62,66],
+["2026-06-28T21:00",28.7,27.5,62,66],
+["2026-06-28T22:00",28.5,27.4,62,66],
+["2026-06-28T23:00",28.4,27.3,62,66],
+["2026-06-29T00:00",28.2,27.2,62,66],
+["2026-06-29T01:00",28.0,27.1,61,66],
+["2026-06-29T02:00",27.8,27.0,61,66],
+["2026-06-29T03:00",27.6,26.9,61,66],
+["2026-06-29T04:00",27.5,26.8,61,66],
+["2026-06-29T05:00",27.3,26.7,61,65],
+["2026-06-29T06:00",27.1,26.5,61,65],
+["2026-06-29T07:00",26.9,26.4,61,65],
+["2026-06-29T08:00",26.3,24.9,51,54],
+["2026-06-29T11:00",23.7,22.7,53,53],
+["2026-06-29T12:00",22.8,22.8,74,55],
+["2026-06-29T14:00",26.5,27.2,54,69],
+["2026-06-29T15:00",26.2,26.8,55,56],
+["2026-06-29T16:00",26.6,27.3,52,53],
+["2026-06-29T17:00",26.6,27.4,51,52]];
+const MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
+let CMP=null;
 
 const $=id=>document.getElementById(id);
 const svp=T=>0.6108*Math.exp(17.27*T/(T+237.3));
@@ -822,15 +958,65 @@ function applyLeaf(D){
   renderLeafChart(D); renderMillsMap(D,{hours:r.spell,temp:r.spellTemp});
   $('l_h1').textContent='Bladnat & schurftdruk · '+relDay(D);
 }
+/* ===== Meting vs verwachting (toren-effect) ===== */
+function cmpChart(labels, series, opt){
+  opt=opt||{}; const W=720,H=280,ml=44,mr=14,mt=16,mb=34,pw=W-ml-mr,ph=H-mt-mb,n=labels.length;
+  let vals=[]; series.forEach(s=>s.data.forEach(v=>{if(v!=null)vals.push(v);}));
+  if(!vals.length) return '<div class="chartmsg">Geen overlappende data.</div>';
+  let vmin=Math.min(...vals),vmax=Math.max(...vals); const pad=(vmax-vmin)*0.1||1; vmin-=pad; vmax+=pad;
+  const X=i=>ml+(n>1?i/(n-1):0.5)*pw, Y=v=>mt+(1-(v-vmin)/(vmax-vmin))*ph;
+  let grid="",yl=""; for(let k=0;k<=4;k++){const v=vmin+(vmax-vmin)*k/4,y=Y(v);
+    grid+=`<line x1="${ml}" y1="${y.toFixed(1)}" x2="${ml+pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,opt.decimals!=null?opt.decimals:0)}</text>`;}
+  let xl=""; const step=Math.max(1,Math.round(n/6)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
+  let paths=""; series.forEach(s=>{let d="",st=false;for(let i=0;i<n;i++){const v=s.data[i];if(v==null){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" ";st=true;}
+    paths+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="${s.w||2.2}"${s.dash?` stroke-dasharray="${s.dash}"`:''} opacity="${s.op||1}"/>`;});
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${grid}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+}
+function renderCompare(){
+  if(!CMP){ compareLoad(); return; }
+  const labels=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[];
+  let sT=0,sRH=0,sVD=0,nn=0;
+  for(const m of MEAS){
+    const ts=m[0], j=CMP.idx[ts]; if(j==null||CMP.t[j]==null) continue;
+    labels.push(ts.slice(8,10)+"-"+ts.slice(11,13)+"u");
+    ft.push(CMP.t[j]); pt.push(m[1]); ot.push(m[2]);
+    frh.push(CMP.rh[j]); prh.push(m[3]); orh.push(m[4]);
+    const pV=vdGm3(m[1],m[3]), oV=vdGm3(m[2],m[4]);
+    fvd.push(CMP.vd[j]); pvd.push(pV); ovd.push(oV);
+    sT+=m[1]-CMP.t[j]; sRH+=m[3]-CMP.rh[j]; sVD+=pV-CMP.vd[j]; nn++;
+  }
+  if(!nn){ $('cmp_t').innerHTML='<div class="chartmsg">Geen overlappende uren tussen meting en verwachting.</div>'; return; }
+  const sgn=(v,d,u)=>(v>=0?'+':'−')+nl(Math.abs(v),d)+' '+u;
+  $('cmp_dT').textContent=sgn(sT/nn,1,'°C'); $('cmp_dRH').textContent=sgn(sRH/nn,0,'%'); $('cmp_dVD').textContent=sgn(sVD/nn,1,'g/m³');
+  $('cmp_note').textContent='Proef-perceel t.o.v. Open-Meteo · '+nn+' overlappende uren ('+MEAS_RANGE.start+' → '+MEAS_RANGE.end+')';
+  const C={f:'#9aa7c2',p:'#e879b8',o:'#6fe3ff'};
+  const S=(f,p,o,w)=>[{color:C.f,dash:'5 4',data:f},{color:C.p,data:p},{color:C.o,w:1.6,op:.85,data:o}];
+  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0});
+  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0});
+  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1});
+}
+function compareLoad(){
+  $('cmp_t').innerHTML='<div class="chartmsg">Verwachting ophalen…</div>';
+  const u="https://api.open-meteo.com/v1/forecast?latitude="+MEAS_RANGE.lat+"&longitude="+MEAS_RANGE.lon+
+    "&hourly=temperature_2m,relative_humidity_2m&start_date="+MEAS_RANGE.start+"&end_date="+MEAS_RANGE.end+"&timezone=Europe%2FAmsterdam";
+  fetch(u).then(r=>r.json()).then(j=>{
+    if(!j.hourly) throw new Error('geen uurdata');
+    const idx={},t=j.hourly.temperature_2m,rh=j.hourly.relative_humidity_2m,vd=[];
+    j.hourly.time.forEach((ts,i)=>{idx[ts]=i; vd.push((t[i]!=null&&rh[i]!=null)?vdGm3(t[i],rh[i]):null);});
+    CMP={time:j.hourly.time,t,rh,vd,idx}; renderCompare();
+  }).catch(e=>{ $('cmp_t').innerHTML='<div class="chartmsg">Kon de verwachting niet ophalen ('+e.message+'). In de preview kan dit geblokkeerd zijn; op de gepubliceerde site werkt het.</div>'; });
+}
 function setView(v){
   document.body.dataset.view=v;
-  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewToday').classList.toggle('on',v==="today");
-  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabToday').classList.toggle('on',v==="today");
+  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewCmp').classList.toggle('on',v==="cmp");$('viewToday').classList.toggle('on',v==="today");
+  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabCmp').classList.toggle('on',v==="cmp");$('tabToday').classList.toggle('on',v==="today");
   if(FC.hourly){relabelDays();}
   if(v==="today"){ renderToday($('daySel').value || new Date().toLocaleDateString('sv-SE')); }
+  else if(v==="cmp"){ renderCompare(); }
   else if(FC.hourly){ applyCurrentView(); }
 }
-$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabToday').onclick=()=>setView("today");
+$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabCmp').onclick=()=>setView("cmp"); $('tabToday').onclick=()=>setView("today");
 $('refresh').onclick=fetchForecast;
 $('daySel').onchange=applyCurrentView;
 $('loc').addEventListener('keydown',e=>{if(e.key==="Enter")fetchForecast();});
