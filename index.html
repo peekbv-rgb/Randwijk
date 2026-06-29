@@ -118,6 +118,10 @@
   .legend i.fdot{width:10px; height:10px; border-radius:50%; background:var(--c)}
   .legend i.shade{width:16px; height:11px; border-radius:3px; background:var(--accent); opacity:.18}
   .legend i.cband{width:16px; height:11px; border-radius:3px; background:#74d68a; opacity:.45}
+  .filerow{display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap}
+  .filebtn{display:inline-block; background:var(--accent); color:#10141f; font-weight:600; padding:8px 14px; border-radius:9px; cursor:pointer; font-size:14px}
+  body[data-view="cmp"] .filebtn{color:#2a0c22}
+  .filebtn input{display:none}
   .legend i.curve{width:20px; height:0; border-top:2.4px solid var(--ink)}
   .legend i.curve.dashed{border-top:2.4px dashed var(--mut)}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:22px}
@@ -345,6 +349,10 @@
          Open-Meteo-verwachting voor dezelfde plek en periode. Het verschil weerspiegelt het lokale
          effect van de toren op temperatuur, RV en VD. <b>Proef</b> = perceel met toren,
          <b>Onbehandeld</b> = referentie, <b>verwacht</b> = Open-Meteo.</p>
+      <div class="filerow">
+        <label class="filebtn">Kies CSV-bestand<input id="cmpFile" type="file" accept=".csv,text/csv"></label>
+        <span class="stat" id="cmpFileStat">ingebakken meting: 26–29 jun 2026 (77 u)</span>
+      </div>
     </header>
     <section class="card">
       <h2>Gemiddeld verschil · meting − verwachting</h2>
@@ -431,7 +439,7 @@ const VD = {
 const DEFAULT_PLACE = {name:"Randwijk", lat:51.937, lon:5.719};
 const FC = {hourly:null, daily:null, place:DEFAULT_PLACE};
 /* ===== Meetstation (WolkyTolky, uurwaarden 26-29 jun 2026) ===== */
-const MEAS=[["2026-06-26T10:00",25.7,22.8,45,51],
+let MEAS=[["2026-06-26T10:00",25.7,22.8,45,51],
 ["2026-06-26T11:00",25.5,22.7,44,50],
 ["2026-06-26T12:00",25.6,23.0,45,51],
 ["2026-06-26T13:00",25.8,23.1,46,52],
@@ -508,7 +516,7 @@ const MEAS=[["2026-06-26T10:00",25.7,22.8,45,51],
 ["2026-06-29T15:00",26.2,26.8,55,56],
 ["2026-06-29T16:00",26.6,27.3,52,53],
 ["2026-06-29T17:00",26.6,27.4,51,52]];
-const MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
+let MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
 let CMP=null;
 
 const $=id=>document.getElementById(id);
@@ -961,7 +969,7 @@ function applyLeaf(D){
 /* ===== Meting vs verwachting (toren-effect) ===== */
 function cmpChart(labels, series, opt){
   opt=opt||{}; const W=720,H=280,ml=44,mr=14,mt=16,mb=34,pw=W-ml-mr,ph=H-mt-mb,n=labels.length;
-  let vals=[]; series.forEach(s=>s.data.forEach(v=>{if(v!=null)vals.push(v);}));
+  let vals=[]; series.forEach(s=>s.data.forEach(v=>{if(v!=null&&isFinite(v))vals.push(v);}));
   if(!vals.length) return '<div class="chartmsg">Geen overlappende data.</div>';
   let vmin=Math.min(...vals),vmax=Math.max(...vals); const pad=(vmax-vmin)*0.1||1; vmin-=pad; vmax+=pad;
   const X=i=>ml+(n>1?i/(n-1):0.5)*pw, Y=v=>mt+(1-(v-vmin)/(vmax-vmin))*ph;
@@ -969,7 +977,7 @@ function cmpChart(labels, series, opt){
     grid+=`<line x1="${ml}" y1="${y.toFixed(1)}" x2="${ml+pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
     yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,opt.decimals!=null?opt.decimals:0)}</text>`;}
   let xl=""; const step=Math.max(1,Math.round(n/6)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
-  let paths=""; series.forEach(s=>{let d="",st=false;for(let i=0;i<n;i++){const v=s.data[i];if(v==null){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" ";st=true;}
+  let paths=""; series.forEach(s=>{let d="",st=false;for(let i=0;i<n;i++){const v=s.data[i];if(v==null||!isFinite(v)){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" ";st=true;}
     paths+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="${s.w||2.2}"${s.dash?` stroke-dasharray="${s.dash}"`:''} opacity="${s.op||1}"/>`;});
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${grid}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
 }
@@ -982,7 +990,7 @@ function renderCompare(){
     labels.push(ts.slice(8,10)+"-"+ts.slice(11,13)+"u");
     ft.push(CMP.t[j]); pt.push(m[1]); ot.push(m[2]);
     frh.push(CMP.rh[j]); prh.push(m[3]); orh.push(m[4]);
-    const pV=vdGm3(m[1],m[3]), oV=vdGm3(m[2],m[4]);
+    const pV=vdGm3(m[1],m[3]), oV=(m[2]!=null&&m[4]!=null)?vdGm3(m[2],m[4]):null;
     fvd.push(CMP.vd[j]); pvd.push(pV); ovd.push(oV);
     sT+=m[1]-CMP.t[j]; sRH+=m[3]-CMP.rh[j]; sVD+=pV-CMP.vd[j]; nn++;
   }
@@ -1007,6 +1015,53 @@ function compareLoad(){
     CMP={time:j.hourly.time,t,rh,vd,idx}; renderCompare();
   }).catch(e=>{ $('cmp_t').innerHTML='<div class="chartmsg">Kon de verwachting niet ophalen ('+e.message+'). In de preview kan dit geblokkeerd zijn; op de gepubliceerde site werkt het.</div>'; });
 }
+function parseCSV(text){
+  const rows=[]; let i=0,field='',row=[],inq=false;
+  const pushF=()=>{row.push(field);field='';}, pushR=()=>{rows.push(row);row=[];};
+  while(i<text.length){const ch=text[i];
+    if(inq){ if(ch=='"'){ if(text[i+1]=='"'){field+='"';i++;} else inq=false; } else field+=ch; }
+    else { if(ch=='"')inq=true; else if(ch==',')pushF(); else if(ch=='\n'){pushF();pushR();} else if(ch!='\r')field+=ch; }
+    i++;
+  }
+  if(field.length||row.length){pushF();pushR();}
+  return rows;
+}
+function loadCsvFile(file){
+  if(!file) return; const st=$('cmpFileStat'); st.textContent='Inlezen…';
+  const rd=new FileReader();
+  rd.onload=()=>{ try{
+    const rows=parseCSV(rd.result); if(rows.length<2) throw new Error('leeg bestand');
+    const hdr=rows[0].map(s=>s.trim()), col=n=>hdr.indexOf(n);
+    const ci={dt:col('Date and time'),pt:col('Proef Temp'),ot:col('Onbehandeld Temp'),
+              prh:col('Proef RH'),orh:col('Onbehandeld RH'),lat:col('Latitude'),lon:col('Longitude')};
+    if(ci.dt<0||ci.pt<0||ci.prh<0) throw new Error('kolommen "Date and time"/"Proef Temp"/"Proef RH" niet gevonden');
+    const num=v=>{const f=parseFloat(v);return isNaN(f)?null:f;};
+    const inb=(v,lo,hi)=>(v==null||v<lo||v>hi)?null:v;
+    const buck={},lats=[],lons=[];
+    for(let r=1;r<rows.length;r++){const row=rows[r]; if(!row[ci.dt]) continue;
+      const key=row[ci.dt].trim().replace(' ','T').slice(0,13)+':00';
+      const pt=inb(num(row[ci.pt]),-30,45), ot=ci.ot>=0?inb(num(row[ci.ot]),-30,45):null;
+      const prh=inb(num(row[ci.prh]),1,100), orh=ci.orh>=0?inb(num(row[ci.orh]),1,100):null;
+      const b=buck[key]||(buck[key]={pt:0,ptn:0,ot:0,otn:0,prh:0,prhn:0,orh:0,orhn:0});
+      if(pt!=null){b.pt+=pt;b.ptn++;} if(ot!=null){b.ot+=ot;b.otn++;}
+      if(prh!=null){b.prh+=prh;b.prhn++;} if(orh!=null){b.orh+=orh;b.orhn++;}
+      if(ci.lat>=0){const la=num(row[ci.lat]),lo=num(row[ci.lon]); if(la!=null&&lo!=null&&la>50&&la<54&&lo>3&&lo<8){lats.push(la);lons.push(lo);}}
+    }
+    const out=[]; Object.keys(buck).sort().forEach(k=>{const b=buck[k]; if(b.ptn&&b.prhn) out.push([k,
+      +(b.pt/b.ptn).toFixed(1), b.otn?+(b.ot/b.otn).toFixed(1):null,
+      Math.round(b.prh/b.prhn), b.orhn?Math.round(b.orh/b.orhn):null]); });
+    if(!out.length) throw new Error('geen geldige uurwaarden gevonden');
+    MEAS=out;
+    // locatie vast op het station (de coördinaten in de export zijn onbetrouwbaar / bevatten GPS-glitches)
+    MEAS_RANGE={start:out[0][0].slice(0,10), end:out[out.length-1][0].slice(0,10),
+      lat:MEAS_RANGE.lat, lon:MEAS_RANGE.lon, place:MEAS_RANGE.place};
+    CMP=null;
+    st.textContent='Geladen: '+out.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
+    renderCompare();
+  }catch(err){ st.textContent='Fout: '+err.message; } };
+  rd.onerror=()=>{ st.textContent='Kon bestand niet lezen.'; };
+  rd.readAsText(file);
+}
 function setView(v){
   document.body.dataset.view=v;
   $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewCmp').classList.toggle('on',v==="cmp");$('viewToday').classList.toggle('on',v==="today");
@@ -1019,6 +1074,7 @@ function setView(v){
 $('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabCmp').onclick=()=>setView("cmp"); $('tabToday').onclick=()=>setView("today");
 $('refresh').onclick=fetchForecast;
 $('daySel').onchange=applyCurrentView;
+$('cmpFile').onchange=e=>loadCsvFile(e.target.files[0]);
 $('loc').addEventListener('keydown',e=>{if(e.key==="Enter")fetchForecast();});
 document.querySelectorAll('#viewFrost input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('f_af').classList.add('hidden');predictFrost();}));
 document.querySelectorAll('#viewVd input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('v_af').classList.add('hidden');predictVd();}));
