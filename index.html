@@ -361,6 +361,7 @@
       <div class="vrow"><span>Temperatuur</span><b id="cmp_dT">—</b></div>
       <div class="vrow"><span>Relatieve vochtigheid</span><b id="cmp_dRH">—</b></div>
       <div class="vrow"><span>Vochtdeficit</span><b id="cmp_dVD">—</b></div>
+      <div class="vrow"><span>Druk / toren</span><b id="cmp_dDruk">—</b></div>
       <div class="sub" id="cmp_note" style="margin-top:8px">Proef-perceel t.o.v. Open-Meteo</div>
     </section>
     <section class="card chartcard">
@@ -388,6 +389,15 @@
         <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht</span>
         <span><i class="curve" style="border-top-color:#e879b8"></i>Proef</span>
         <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Druk (bar) · toren / beregening</h2>
+      <div id="cmp_p"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#ff9d3c"></i>druk (uurpiek)</span>
+        <span><i class="curve dashed" style="border-top-color:#ff9d3c"></i>drempel "aan"</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
       </div>
     </section>
     <footer>
@@ -441,85 +451,86 @@ const VD = {
 const DEFAULT_PLACE = {name:"Randwijk", lat:51.937, lon:5.719};
 const FC = {hourly:null, daily:null, place:DEFAULT_PLACE};
 /* ===== Meetstation (WolkyTolky, uurwaarden 26-29 jun 2026) ===== */
-let MEAS=[["2026-06-26T10:00",25.7,22.8,45,51],
-["2026-06-26T11:00",25.5,22.7,44,50],
-["2026-06-26T12:00",25.6,23.0,45,51],
-["2026-06-26T13:00",25.8,23.1,46,52],
-["2026-06-26T14:00",26.2,23.6,46,53],
-["2026-06-26T15:00",26.4,23.9,46,52],
-["2026-06-26T16:00",26.6,24.0,45,52],
-["2026-06-26T17:00",27.3,25.2,53,55],
-["2026-06-26T18:00",28.0,26.0,56,59],
-["2026-06-26T19:00",28.5,26.5,56,60],
-["2026-06-26T20:00",28.7,26.7,57,61],
-["2026-06-26T21:00",28.8,26.8,58,62],
-["2026-06-26T22:00",28.8,26.9,59,63],
-["2026-06-26T23:00",28.8,26.9,59,64],
-["2026-06-27T00:00",28.7,26.9,60,64],
-["2026-06-27T01:00",28.6,26.9,60,64],
-["2026-06-27T02:00",28.5,26.8,60,64],
-["2026-06-27T03:00",28.4,26.8,61,65],
-["2026-06-27T04:00",28.2,26.8,60,65],
-["2026-06-27T05:00",28.1,26.7,60,65],
-["2026-06-27T06:00",27.9,26.6,60,65],
-["2026-06-27T07:00",27.8,26.6,60,65],
-["2026-06-27T08:00",27.7,26.5,60,64],
-["2026-06-27T09:00",27.7,26.5,60,64],
-["2026-06-27T10:00",27.8,26.6,60,64],
-["2026-06-27T11:00",28.0,26.7,60,64],
-["2026-06-27T12:00",28.2,26.9,60,64],
-["2026-06-27T13:00",28.5,27.1,60,65],
-["2026-06-27T14:00",28.8,27.3,60,65],
-["2026-06-27T15:00",29.2,27.4,61,66],
-["2026-06-27T16:00",29.4,27.6,62,67],
-["2026-06-27T17:00",29.7,27.8,63,67],
-["2026-06-27T18:00",29.9,27.9,63,68],
-["2026-06-27T19:00",30.1,28.1,63,68],
-["2026-06-27T20:00",30.2,28.1,63,68],
-["2026-06-27T21:00",30.2,28.2,63,68],
-["2026-06-27T22:00",30.1,28.2,63,68],
-["2026-06-27T23:00",30.0,28.1,63,68],
-["2026-06-28T00:00",29.8,28.1,63,68],
-["2026-06-28T01:00",29.7,28.0,63,68],
-["2026-06-28T02:00",29.5,27.9,62,68],
-["2026-06-28T03:00",29.3,27.8,62,67],
-["2026-06-28T04:00",29.1,27.7,62,67],
-["2026-06-28T05:00",28.9,27.6,61,67],
-["2026-06-28T06:00",28.7,27.5,61,67],
-["2026-06-28T07:00",28.5,27.4,61,66],
-["2026-06-28T08:00",28.3,27.3,61,66],
-["2026-06-28T09:00",28.3,27.3,61,66],
-["2026-06-28T10:00",28.3,27.3,61,66],
-["2026-06-28T11:00",28.3,27.3,60,65],
-["2026-06-28T12:00",28.4,27.4,61,65],
-["2026-06-28T13:00",28.6,27.5,61,65],
-["2026-06-28T14:00",28.8,27.6,60,65],
-["2026-06-28T15:00",28.9,27.7,61,65],
-["2026-06-28T16:00",28.9,27.7,61,66],
-["2026-06-28T17:00",28.9,27.7,62,66],
-["2026-06-28T18:00",28.8,27.6,62,66],
-["2026-06-28T19:00",28.8,27.6,62,66],
-["2026-06-28T20:00",28.7,27.5,62,66],
-["2026-06-28T21:00",28.7,27.5,62,66],
-["2026-06-28T22:00",28.5,27.4,62,66],
-["2026-06-28T23:00",28.4,27.3,62,66],
-["2026-06-29T00:00",28.2,27.2,62,66],
-["2026-06-29T01:00",28.0,27.1,61,66],
-["2026-06-29T02:00",27.8,27.0,61,66],
-["2026-06-29T03:00",27.6,26.9,61,66],
-["2026-06-29T04:00",27.5,26.8,61,66],
-["2026-06-29T05:00",27.3,26.7,61,65],
-["2026-06-29T06:00",27.1,26.5,61,65],
-["2026-06-29T07:00",26.9,26.4,61,65],
-["2026-06-29T08:00",26.3,24.9,51,54],
-["2026-06-29T11:00",23.7,22.7,53,53],
-["2026-06-29T12:00",22.8,22.8,74,55],
-["2026-06-29T14:00",26.5,27.2,54,69],
-["2026-06-29T15:00",26.2,26.8,55,56],
-["2026-06-29T16:00",26.6,27.3,52,53],
-["2026-06-29T17:00",26.6,27.4,51,52]];
+let MEAS=[["2026-06-26T10:00",25.7,22.8,45,51,1.0],
+["2026-06-26T11:00",25.5,22.7,44,50,1.0],
+["2026-06-26T12:00",25.6,23.0,45,51,1.0],
+["2026-06-26T13:00",25.8,23.1,46,52,0.9],
+["2026-06-26T14:00",26.2,23.6,46,53,0.9],
+["2026-06-26T15:00",26.4,23.9,46,52,0.9],
+["2026-06-26T16:00",26.6,24.0,45,52,0.9],
+["2026-06-26T17:00",27.3,25.2,53,55,0.9],
+["2026-06-26T18:00",28.0,26.0,56,59,0.9],
+["2026-06-26T19:00",28.5,26.5,56,60,0.9],
+["2026-06-26T20:00",28.7,26.7,57,61,0.9],
+["2026-06-26T21:00",28.8,26.8,58,62,0.9],
+["2026-06-26T22:00",28.8,26.9,59,63,0.9],
+["2026-06-26T23:00",28.8,26.9,59,64,1.0],
+["2026-06-27T00:00",28.7,26.9,60,64,0.9],
+["2026-06-27T01:00",28.6,26.9,60,64,1.0],
+["2026-06-27T02:00",28.5,26.8,60,64,1.0],
+["2026-06-27T03:00",28.4,26.8,61,65,1.0],
+["2026-06-27T04:00",28.2,26.8,60,65,0.9],
+["2026-06-27T05:00",28.1,26.7,60,65,0.9],
+["2026-06-27T06:00",27.9,26.6,60,65,1.0],
+["2026-06-27T07:00",27.8,26.6,60,65,1.0],
+["2026-06-27T08:00",27.7,26.5,60,64,1.0],
+["2026-06-27T09:00",27.7,26.5,60,64,0.9],
+["2026-06-27T10:00",27.8,26.6,60,64,0.9],
+["2026-06-27T11:00",28.0,26.7,60,64,0.9],
+["2026-06-27T12:00",28.2,26.9,60,64,1.0],
+["2026-06-27T13:00",28.5,27.1,60,65,0.9],
+["2026-06-27T14:00",28.8,27.3,60,65,0.9],
+["2026-06-27T15:00",29.2,27.4,61,66,0.9],
+["2026-06-27T16:00",29.4,27.6,62,67,0.9],
+["2026-06-27T17:00",29.7,27.8,63,67,0.9],
+["2026-06-27T18:00",29.9,27.9,63,68,0.9],
+["2026-06-27T19:00",30.1,28.1,63,68,0.9],
+["2026-06-27T20:00",30.2,28.1,63,68,0.9],
+["2026-06-27T21:00",30.2,28.2,63,68,0.9],
+["2026-06-27T22:00",30.1,28.2,63,68,0.9],
+["2026-06-27T23:00",30.0,28.1,63,68,0.9],
+["2026-06-28T00:00",29.8,28.1,63,68,0.9],
+["2026-06-28T01:00",29.7,28.0,63,68,0.9],
+["2026-06-28T02:00",29.5,27.9,62,68,0.9],
+["2026-06-28T03:00",29.3,27.8,62,67,0.9],
+["2026-06-28T04:00",29.1,27.7,62,67,0.9],
+["2026-06-28T05:00",28.9,27.6,61,67,0.9],
+["2026-06-28T06:00",28.7,27.5,61,67,0.9],
+["2026-06-28T07:00",28.5,27.4,61,66,1.0],
+["2026-06-28T08:00",28.3,27.3,61,66,0.9],
+["2026-06-28T09:00",28.3,27.3,61,66,1.0],
+["2026-06-28T10:00",28.3,27.3,61,66,1.0],
+["2026-06-28T11:00",28.3,27.3,60,65,1.0],
+["2026-06-28T12:00",28.4,27.4,61,65,1.0],
+["2026-06-28T13:00",28.6,27.5,61,65,1.0],
+["2026-06-28T14:00",28.8,27.6,60,65,1.0],
+["2026-06-28T15:00",28.9,27.7,61,65,1.0],
+["2026-06-28T16:00",28.9,27.7,61,66,1.0],
+["2026-06-28T17:00",28.9,27.7,62,66,1.0],
+["2026-06-28T18:00",28.8,27.6,62,66,1.0],
+["2026-06-28T19:00",28.8,27.6,62,66,1.0],
+["2026-06-28T20:00",28.7,27.5,62,66,1.0],
+["2026-06-28T21:00",28.7,27.5,62,66,1.0],
+["2026-06-28T22:00",28.5,27.4,62,66,1.0],
+["2026-06-28T23:00",28.4,27.3,62,66,1.0],
+["2026-06-29T00:00",28.2,27.2,62,66,1.0],
+["2026-06-29T01:00",28.0,27.1,61,66,1.0],
+["2026-06-29T02:00",27.8,27.0,61,66,1.0],
+["2026-06-29T03:00",27.6,26.9,61,66,1.0],
+["2026-06-29T04:00",27.5,26.8,61,66,1.0],
+["2026-06-29T05:00",27.3,26.7,61,65,1.0],
+["2026-06-29T06:00",27.1,26.5,61,65,1.0],
+["2026-06-29T07:00",26.9,26.4,61,65,1.0],
+["2026-06-29T08:00",26.3,24.9,51,54,1.0],
+["2026-06-29T11:00",23.7,22.7,53,53,1.0],
+["2026-06-29T12:00",22.8,22.8,74,55,1.0],
+["2026-06-29T14:00",26.5,27.2,54,69,1.0],
+["2026-06-29T15:00",26.2,26.8,55,56,5.5],
+["2026-06-29T16:00",26.6,27.3,52,53,1.0],
+["2026-06-29T17:00",26.6,27.4,51,52,1.0]];
 let MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
 let CMP=null;
+const DRUK_ON=1.5;   /* bar — drempel waarboven we de toren/beregening als 'aan' markeren */
 
 const $=id=>document.getElementById(id);
 const svp=T=>0.6108*Math.exp(17.27*T/(T+237.3));
@@ -1017,14 +1028,19 @@ function cmpChart(labels, series, opt){
     grid+=`<line x1="${ml}" y1="${y.toFixed(1)}" x2="${ml+pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
     yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,dec)}</text>`;}
   let xl=""; const step=Math.max(1,Math.round(n/16)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
+  const colW=n>1?pw/(n-1):pw;
+  let bands=""; if(opt.onMask){for(let i=0;i<n;i++){if(opt.onMask[i]){const x0=Math.max(ml,X(i)-colW/2),x1=Math.min(ml+pw,X(i)+colW/2);
+    bands+=`<rect x="${x0.toFixed(1)}" y="${mt}" width="${(x1-x0).toFixed(1)}" height="${ph}" fill="#ff9d3c" opacity="0.22"/>`;}}}
+  let thr=""; if(opt.thresh!=null&&opt.thresh>=vmin&&opt.thresh<=vmax){const ty=Y(opt.thresh);
+    thr=`<line x1="${ml}" y1="${ty.toFixed(1)}" x2="${ml+pw}" y2="${ty.toFixed(1)}" stroke="#ff9d3c" stroke-width="1.3" stroke-dasharray="4 4" opacity=".85"/>`;}
   let paths=""; series.forEach(s=>{let d="",st=false;for(let i=0;i<n;i++){const v=s.data[i];if(v==null||!isFinite(v)){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" ";st=true;}
     paths+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="${s.w||2.2}"${s.dash?` stroke-dasharray="${s.dash}"`:''} opacity="${s.op||1}"/>`;});
-  const colW=n>1?pw/(n-1):pw; let hits="";
+  let hits="";
   for(let i=0;i<n;i++){ const hx=Math.max(ml,X(i)-colW/2);
     hits+=`<rect class="hit" x="${hx.toFixed(1)}" y="${mt}" width="${colW.toFixed(1)}" height="${ph}"/>`;}
   if(opt.id) HOV[opt.id]={ml,pw,W,H,n,dec,unit,labels,series};
   const cross=`<line class="cross" x1="0" y1="${mt}" x2="0" y2="${mt+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,var(--accent) 12%, transparent)}</style>${grid}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,var(--accent) 12%, transparent)}</style>${bands}${grid}${thr}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
 }
 function cmpPeriodText(){
   const MN=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
@@ -1042,8 +1058,8 @@ function updateCmpMeta(){
 function renderCompare(){
   updateCmpMeta();
   if(!CMP){ compareLoad(); return; }
-  const labels=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[];
-  let sT=0,sRH=0,sVD=0,nn=0;
+  const labels=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[],druk=[],onMask=[];
+  let sT=0,sRH=0,sVD=0,nn=0, drukMax=null, onUren=0;
   for(const m of MEAS){
     const ts=m[0], j=CMP.idx[ts]; if(j==null||CMP.t[j]==null) continue;
     labels.push(ts.slice(8,10)+"-"+ts.slice(11,13)+"u");
@@ -1051,17 +1067,25 @@ function renderCompare(){
     frh.push(CMP.rh[j]); prh.push(m[3]); orh.push(m[4]);
     const pV=vdGm3(m[1],m[3]), oV=(m[2]!=null&&m[4]!=null)?vdGm3(m[2],m[4]):null;
     fvd.push(CMP.vd[j]); pvd.push(pV); ovd.push(oV);
+    const dr=(m.length>5)?m[5]:null; druk.push(dr);
+    const aan=(dr!=null&&dr>=DRUK_ON); onMask.push(aan);
+    if(dr!=null){ drukMax=(drukMax==null)?dr:Math.max(drukMax,dr); if(aan)onUren++; }
     sT+=m[1]-CMP.t[j]; sRH+=m[3]-CMP.rh[j]; sVD+=pV-CMP.vd[j]; nn++;
   }
   if(!nn){ cmpMsg('Geen overlappende uren tussen meting en verwachting.'); return; }
   const sgn=(v,d,u)=>(v>=0?'+':'−')+nl(Math.abs(v),d)+' '+u;
   $('cmp_dT').textContent=sgn(sT/nn,1,'°C'); $('cmp_dRH').textContent=sgn(sRH/nn,0,'%'); $('cmp_dVD').textContent=sgn(sVD/nn,1,'g/m³');
+  if($('cmp_dDruk')) $('cmp_dDruk').textContent = drukMax!=null ? ('piek '+nl(drukMax,1)+' bar · '+onUren+' u ≥ '+nl(DRUK_ON,1)+' bar') : 'geen drukdata';
   $('cmp_note').textContent='Proef-perceel t.o.v. Open-Meteo · '+nn+' overlappende uren ('+MEAS_RANGE.start+' → '+MEAS_RANGE.end+')';
   const C={f:'#9aa7c2',p:'#e879b8',o:'#6fe3ff'};
   const S=(f,p,o)=>[{name:'verwacht',color:C.f,dash:'5 4',data:f},{name:'Proef',color:C.p,data:p},{name:'Onbehandeld',color:C.o,w:1.6,op:.85,data:o}];
-  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0,unit:' °C',id:'cmp_t'}); wireHover('cmp_t');
-  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0,unit:' %',id:'cmp_rh'}); wireHover('cmp_rh');
-  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1,unit:' g/m³',id:'cmp_vd'}); wireHover('cmp_vd');
+  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0,unit:' °C',id:'cmp_t',onMask}); wireHover('cmp_t');
+  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0,unit:' %',id:'cmp_rh',onMask}); wireHover('cmp_rh');
+  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1,unit:' g/m³',id:'cmp_vd',onMask}); wireHover('cmp_vd');
+  if($('cmp_p')){
+    if(drukMax==null) $('cmp_p').innerHTML='<div class="chartmsg">Geen drukkolom in deze meting.</div>';
+    else { $('cmp_p').innerHTML=cmpChart(labels,[{name:'druk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'cmp_p',onMask,thresh:DRUK_ON}); wireHover('cmp_p'); }
+  }
 }
 function buildCmpFromFC(){
   if(!FC.hourly||!FC.hourly.time) return false;
@@ -1105,7 +1129,7 @@ function loadCsvFile(file){
     const rows=parseCSV(rd.result); if(rows.length<2) throw new Error('leeg bestand');
     const hdr=rows[0].map(s=>s.trim()), col=n=>hdr.indexOf(n);
     const ci={dt:col('Date and time'),pt:col('Proef Temp'),ot:col('Onbehandeld Temp'),
-              prh:col('Proef RH'),orh:col('Onbehandeld RH'),lat:col('Latitude'),lon:col('Longitude')};
+              prh:col('Proef RH'),orh:col('Onbehandeld RH'),druk:col('Druk'),lat:col('Latitude'),lon:col('Longitude')};
     if(ci.dt<0||ci.pt<0||ci.prh<0) throw new Error('kolommen "Date and time"/"Proef Temp"/"Proef RH" niet gevonden');
     const num=v=>{const f=parseFloat(v);return isNaN(f)?null:f;};
     const inb=(v,lo,hi)=>(v==null||v<lo||v>hi)?null:v;
@@ -1114,14 +1138,17 @@ function loadCsvFile(file){
       const key=row[ci.dt].trim().replace(' ','T').slice(0,13)+':00';
       const pt=inb(num(row[ci.pt]),-30,45), ot=ci.ot>=0?inb(num(row[ci.ot]),-30,45):null;
       const prh=inb(num(row[ci.prh]),1,100), orh=ci.orh>=0?inb(num(row[ci.orh]),1,100):null;
-      const b=buck[key]||(buck[key]={pt:0,ptn:0,ot:0,otn:0,prh:0,prhn:0,orh:0,orhn:0});
+      const dr=ci.druk>=0?inb(num(row[ci.druk]),0,50):null;
+      const b=buck[key]||(buck[key]={pt:0,ptn:0,ot:0,otn:0,prh:0,prhn:0,orh:0,orhn:0,druk:null});
       if(pt!=null){b.pt+=pt;b.ptn++;} if(ot!=null){b.ot+=ot;b.otn++;}
       if(prh!=null){b.prh+=prh;b.prhn++;} if(orh!=null){b.orh+=orh;b.orhn++;}
+      if(dr!=null){b.druk=(b.druk==null)?dr:Math.max(b.druk,dr);}   /* uurmaximum: vangt korte drukpieken */
       if(ci.lat>=0){const la=num(row[ci.lat]),lo=num(row[ci.lon]); if(la!=null&&lo!=null&&la>50&&la<54&&lo>3&&lo<8){lats.push(la);lons.push(lo);}}
     }
     const out=[]; Object.keys(buck).sort().forEach(k=>{const b=buck[k]; if(b.ptn&&b.prhn) out.push([k,
       +(b.pt/b.ptn).toFixed(1), b.otn?+(b.ot/b.otn).toFixed(1):null,
-      Math.round(b.prh/b.prhn), b.orhn?Math.round(b.orh/b.orhn):null]); });
+      Math.round(b.prh/b.prhn), b.orhn?Math.round(b.orh/b.orhn):null,
+      b.druk!=null?+b.druk.toFixed(1):null]); });
     if(!out.length) throw new Error('geen geldige uurwaarden gevonden');
     MEAS=out;
     // locatie vast op het station (de coördinaten in de export zijn onbetrouwbaar / bevatten GPS-glitches)
