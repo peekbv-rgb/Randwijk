@@ -122,6 +122,8 @@
   .filebtn{display:inline-block; background:var(--accent); color:#10141f; font-weight:600; padding:8px 14px; border-radius:9px; cursor:pointer; font-size:14px}
   body[data-view="cmp"] .filebtn{color:#2a0c22}
   .filebtn input{display:none}
+  .charthov{position:relative}
+  .charthov .tip{position:absolute; pointer-events:none; display:none; background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font:500 12px/1.5 Inter,system-ui,sans-serif; color:var(--ink); box-shadow:0 8px 22px -10px var(--shadow); white-space:nowrap; z-index:6}
   .legend i.curve{width:20px; height:0; border-top:2.4px solid var(--ink)}
   .legend i.curve.dashed{border-top:2.4px dashed var(--mut)}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:22px}
@@ -389,9 +391,9 @@
       </div>
     </section>
     <footer>
-      Momentopname (26–29 juni 2026, uurwaarden). De verwachting wordt live bij Open-Meteo opgehaald
-      voor de stationslocatie. Voor een doorlopende vergelijking is een live datafeed van het station
-      nodig; dit is nu een eenmalige export.
+      Momentopname (<span id="cmp_period">26–29 jun 2026</span>, <span id="cmp_hours">77</span> uurwaarden).
+      De verwachting wordt live bij Open-Meteo opgehaald voor de stationslocatie. Voor een doorlopende
+      vergelijking is een live datafeed van het station nodig; nu laad je per export een CSV in.
     </footer>
   </div>
 
@@ -609,7 +611,7 @@ async function fetchForecast(){
     }
     const url="https://api.open-meteo.com/v1/forecast?latitude="+place.lat+"&longitude="+place.lon+
       "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,precipitation,vapour_pressure_deficit"+
-      "&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FAmsterdam&past_days=3&forecast_days=3";
+      "&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FAmsterdam&past_days=7&forecast_days=3";
     const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status);
     const j=await r.json();
     FC.hourly=j.hourly; FC.daily=j.daily; FC.place=place;
@@ -695,10 +697,10 @@ function lineChart(xs, ys, opt){
   if(opt.bandLo!=null&&opt.bandHi!=null){const yhi=Y(Math.min(opt.bandHi,vmax)),ylo=Y(Math.max(opt.bandLo,vmin));
     yband=`<rect x="${ml}" y="${yhi.toFixed(1)}" width="${pw}" height="${Math.max(0,ylo-yhi).toFixed(1)}" fill="#74d68a" opacity="0.13"/>`;}
   let grid="",yl="";
-  for(let g=0;g<=4;g++){const gy=mt+g/4*ph,gv=vmax-g/4*(vmax-vmin);
+  for(let g=0;g<=8;g++){const gy=mt+g/8*ph,gv=vmax-g/8*(vmax-vmin);
     grid+=`<line x1="${ml}" y1="${gy}" x2="${ml+pw}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>`;
     yl+=`<text x="${ml-6}" y="${gy+3.5}" text-anchor="end" class="ax">${gv.toFixed(dec)}</text>`;}
-  let xl="",step=Math.max(1,Math.round(n/7));
+  let xl="",step=n<=26?1:Math.max(1,Math.round(n/16));
   for(let i=0;i<n;i+=step){xl+=`<text x="${X(i)}" y="${H-9}" text-anchor="middle" class="ax">${pad2(xs[i]%24)}</text>`;}
   let d=""; xs.forEach((_,i)=>{if(ys[i]==null)return;d+=(d?"L":"M")+X(i).toFixed(1)+" "+Y(ys[i]).toFixed(1)+" ";});
   let pred="";
@@ -707,7 +709,12 @@ function lineChart(xs, ys, opt){
     if(opt.predDotIdx!=null){const px=X(opt.predDotIdx);
       pred+=`<path d="M ${px} ${py-5} L ${px+5} ${py} L ${px} ${py+5} L ${px-5} ${py} Z" fill="var(--bg2)" stroke="${opt.predColor}" stroke-width="2"/>`;}
     pred+=`<text x="${ml+pw-2}" y="${py-6}" text-anchor="end" class="ax" fill="${opt.predColor}">${nl(opt.pred,dec)}${opt.unit||''}</text>`;}
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${shade}${yband}${grid}${pred}<path d="${d.trim()}" fill="none" stroke="${opt.color}" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+  const colW=n>1?pw/(n-1):pw; let hits="";
+  for(let i=0;i<n;i++){ if(ys[i]==null) continue; const hx=X(i)-colW/2;
+    hits+=`<rect class="hit" x="${Math.max(ml,hx).toFixed(1)}" y="${mt}" width="${colW.toFixed(1)}" height="${ph}"/>`;}
+  if(opt.id) HOV[opt.id]={ml,pw,W,H,n,dec,unit:opt.unit||'',labels:xs.map(h=>pad2(((h%24)+24)%24)+':00'),series:[{name:opt.name||'',color:opt.color,data:ys}]};
+  const cross=`<line class="cross" x1="0" y1="${mt}" x2="0" y2="${mt+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,${opt.color} 12%, transparent)}</style>${shade}${yband}${grid}${pred}<path d="${d.trim()}" fill="none" stroke="${opt.color}" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
 }
 function renderFrostChart(D){
   const box=$('f_chart'); if(!box) return null;
@@ -718,7 +725,7 @@ function renderFrostChart(D){
   if(ys.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze nacht.</div>';return null;}
   let dipIdx=null,lo=Infinity; for(let idx=6;idx<=21;idx++){if(ys[idx]!=null&&ys[idx]<lo){lo=ys[idx];dipIdx=idx;}}
   box.innerHTML=lineChart(xs,ys,{color:'#6fe3ff',pred:dipIdx!=null?ys[dipIdx]:null,predColor:'#a7c2ff',
-    predDotIdx:dipIdx,winFrom:6,winTo:21,decimals:0,unit:' °C',minSpan:5});
+    predDotIdx:dipIdx,winFrom:6,winTo:21,decimals:0,unit:' °C',minSpan:5,name:'temp',id:'f_chart'}); wireHover('f_chart');
   return dipIdx!=null?{min:ys[dipIdx],hour:xs[dipIdx]}:null;
 }
 function renderVdMap(D, peak){
@@ -761,7 +768,7 @@ function renderVdChart(D){
   if(ys.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze dag.</div>';return null;}
   let peakIdx=null,hi=-Infinity; for(let idx=10;idx<=18;idx++){if(ys[idx]!=null&&ys[idx]>hi){hi=ys[idx];peakIdx=idx;}}
   box.innerHTML=lineChart(xs,ys,{color:'#ffc24b',pred:peakIdx!=null?ys[peakIdx]:null,predColor:'#4fd0e0',
-    predDotIdx:peakIdx,winFrom:10,winTo:18,vmin:0,decimals:1,unit:' g/m³',minSpan:4,bandLo:2,bandHi:10});
+    predDotIdx:peakIdx,winFrom:10,winTo:18,vmin:0,decimals:1,unit:' g/m³',minSpan:4,bandLo:2,bandHi:10,name:'VD',id:'v_chart'}); wireHover('v_chart');
   return peakIdx!=null?{peak:ys[peakIdx],hour:xs[peakIdx]}:null;
 }
 function doyD(D){const dd=new Date(D+"T12:00:00");return Math.round((dd-new Date(dd.getFullYear(),0,0))/864e5);}
@@ -927,11 +934,18 @@ function renderLeafChart(D){
   if(rh.filter(v=>v!=null).length<3){box.innerHTML='<div class="chartmsg">Geen uurdata voor deze dag.</div>';return;}
   let bands=""; for(let k=0;k<24;k++){ if(wet[k]){const x0=X(Math.max(0,k-0.5)),x1=X(Math.min(23,k+0.5));
     bands+=`<rect x="${x0.toFixed(1)}" y="${mt}" width="${(x1-x0).toFixed(1)}" height="${ph}" fill="#67d29a" opacity="0.18"/>`;}}
-  let grid="",yl=""; for(let v=0;v<=100;v+=20){const y=Y(v);grid+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;yl+=`<text x="${ml-6}" y="${y+3.5}" text-anchor="end" class="ax">${v}</text>`;}
+  let grid="",yl=""; for(let v=0;v<=100;v+=10){const y=Y(v);grid+=`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;yl+=`<text x="${ml-6}" y="${y+3.5}" text-anchor="end" class="ax">${v}</text>`;}
   const y90=Y(90), line90=`<line x1="${ml}" y1="${y90}" x2="${ml+pw}" y2="${y90}" stroke="#a7c2ff" stroke-width="1.5" stroke-dasharray="5 4" opacity=".8"/><text x="${ml+pw-2}" y="${y90-5}" text-anchor="end" class="ax" fill="#a7c2ff">90 %</text>`;
-  let xl=""; for(let k=0;k<=24;k+=4){xl+=`<text x="${X(Math.min(k,23))}" y="${H-9}" text-anchor="middle" class="ax">${pad2(k%24)}</text>`;}
+  let xl=""; for(let k=0;k<24;k++){xl+=`<text x="${X(k)}" y="${H-9}" text-anchor="middle" class="ax">${pad2(k)}</text>`;}
   let d="",started=false; for(let k=0;k<24;k++){ if(rh[k]==null){started=false;continue;} d+=(started?"L":"M")+X(k).toFixed(1)+" "+Y(rh[k]).toFixed(1)+" "; started=true; }
-  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${bands}${grid}${line90}<path d="${d.trim()}" fill="none" stroke="#67d29a" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+  const colW=pw/23; let hits="";
+  for(let k=0;k<24;k++){ if(rh[k]==null) continue; const hx=Math.max(ml,X(k)-colW/2);
+    hits+=`<rect class="hit" x="${hx.toFixed(1)}" y="${mt}" width="${colW.toFixed(1)}" height="${ph}"/>`;}
+  HOV['l_chart']={ml,pw,W,H,n:24,dec:0,unit:' %',labels:Array.from({length:24},(_,k)=>pad2(k)+':00'),
+    series:[{name:'RV',color:'#67d29a',data:rh}]};
+  const cross=`<line class="cross" x1="0" y1="${mt}" x2="0" y2="${mt+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>`;
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,#67d29a 14%, transparent)}</style>${bands}${grid}${line90}<path d="${d.trim()}" fill="none" stroke="#67d29a" stroke-width="2.4"/>${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
+  wireHover('l_chart');
 }
 function renderMillsMap(D, spell){
   const box=$('l_map'); if(!box) return;
@@ -967,21 +981,66 @@ function applyLeaf(D){
   $('l_h1').textContent='Bladnat & schurftdruk · '+relDay(D);
 }
 /* ===== Meting vs verwachting (toren-effect) ===== */
+/* ===== Interactieve hover: zichtbaar waardevenster + verticale hulplijn ===== */
+const HOV={};
+function wireHover(id){
+  const box=$(id); if(!box) return; const svg=box.querySelector('svg'); const h=HOV[id];
+  if(!svg||!h) return;
+  box.classList.add('charthov');
+  let tip=box.querySelector('.tip'); if(!tip){tip=document.createElement('div'); tip.className='tip'; box.appendChild(tip);}
+  const cross=svg.querySelector('.cross');
+  const hide=()=>{tip.style.display='none'; if(cross)cross.style.display='none';};
+  svg.addEventListener('mousemove',ev=>{
+    const r=svg.getBoundingClientRect(); if(!r.width) return;
+    const vbX=(ev.clientX-r.left)/r.width*h.W;
+    let i=Math.round((vbX-h.ml)/h.pw*(h.n-1)); i=Math.max(0,Math.min(h.n-1,i));
+    let html='<b>'+h.labels[i]+'</b>',any=false;
+    h.series.forEach(s=>{const v=s.data[i]; if(v!=null&&isFinite(v)){any=true;
+      html+='<br><span style="color:'+s.color+'">●</span> '+(s.name?s.name+': ':'')+nl(v,h.dec)+h.unit;}});
+    if(!any){hide();return;}
+    tip.innerHTML=html; tip.style.display='block';
+    const bx=ev.clientX-r.left, by=ev.clientY-r.top;
+    tip.style.left=Math.max(4,Math.min(box.clientWidth-tip.offsetWidth-6, bx+14))+'px';
+    tip.style.top=Math.max(4, by-tip.offsetHeight-10)+'px';
+    if(cross){const cx=h.ml+i/(h.n-1)*h.pw; cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.style.display='';}
+  });
+  svg.addEventListener('mouseleave',hide);
+}
 function cmpChart(labels, series, opt){
   opt=opt||{}; const W=720,H=280,ml=44,mr=14,mt=16,mb=34,pw=W-ml-mr,ph=H-mt-mb,n=labels.length;
+  const dec=opt.decimals!=null?opt.decimals:0, unit=opt.unit||'';
   let vals=[]; series.forEach(s=>s.data.forEach(v=>{if(v!=null&&isFinite(v))vals.push(v);}));
   if(!vals.length) return '<div class="chartmsg">Geen overlappende data.</div>';
   let vmin=Math.min(...vals),vmax=Math.max(...vals); const pad=(vmax-vmin)*0.1||1; vmin-=pad; vmax+=pad;
   const X=i=>ml+(n>1?i/(n-1):0.5)*pw, Y=v=>mt+(1-(v-vmin)/(vmax-vmin))*ph;
-  let grid="",yl=""; for(let k=0;k<=4;k++){const v=vmin+(vmax-vmin)*k/4,y=Y(v);
+  let grid="",yl=""; for(let k=0;k<=8;k++){const v=vmin+(vmax-vmin)*(1-k/8),y=mt+k/8*ph;
     grid+=`<line x1="${ml}" y1="${y.toFixed(1)}" x2="${ml+pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
-    yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,opt.decimals!=null?opt.decimals:0)}</text>`;}
-  let xl=""; const step=Math.max(1,Math.round(n/6)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
+    yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,dec)}</text>`;}
+  let xl=""; const step=Math.max(1,Math.round(n/16)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
   let paths=""; series.forEach(s=>{let d="",st=false;for(let i=0;i<n;i++){const v=s.data[i];if(v==null||!isFinite(v)){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)+" ";st=true;}
     paths+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="${s.w||2.2}"${s.dash?` stroke-dasharray="${s.dash}"`:''} opacity="${s.op||1}"/>`;});
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}</style>${grid}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/></svg>`;
+  const colW=n>1?pw/(n-1):pw; let hits="";
+  for(let i=0;i<n;i++){ const hx=Math.max(ml,X(i)-colW/2);
+    hits+=`<rect class="hit" x="${hx.toFixed(1)}" y="${mt}" width="${colW.toFixed(1)}" height="${ph}"/>`;}
+  if(opt.id) HOV[opt.id]={ml,pw,W,H,n,dec,unit,labels,series};
+  const cross=`<line class="cross" x1="0" y1="${mt}" x2="0" y2="${mt+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,var(--accent) 12%, transparent)}</style>${grid}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
+}
+function cmpPeriodText(){
+  const MN=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const a=MEAS_RANGE.start.split('-'), b=MEAS_RANGE.end.split('-');
+  if(a[0]===b[0]&&a[1]===b[1]) return (+a[2])+'–'+(+b[2])+' '+MN[+a[1]-1]+' '+a[0];
+  return (+a[2])+' '+MN[+a[1]-1]+' – '+(+b[2])+' '+MN[+b[1]-1]+' '+b[0];
+}
+function updateCmpMeta(){
+  const t=cmpPeriodText();
+  if($('cmp_period')) $('cmp_period').textContent=t;
+  if($('cmp_hours')) $('cmp_hours').textContent=MEAS.length;
+  const st=$('cmpFileStat'); if(st && st.textContent.indexOf('Geladen')<0 && st.textContent.indexOf('Fout')<0 && st.textContent.indexOf('Inlezen')<0)
+    st.textContent='meting: '+t+' ('+MEAS.length+' u)';
 }
 function renderCompare(){
+  updateCmpMeta();
   if(!CMP){ compareLoad(); return; }
   const labels=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[];
   let sT=0,sRH=0,sVD=0,nn=0;
@@ -994,26 +1053,39 @@ function renderCompare(){
     fvd.push(CMP.vd[j]); pvd.push(pV); ovd.push(oV);
     sT+=m[1]-CMP.t[j]; sRH+=m[3]-CMP.rh[j]; sVD+=pV-CMP.vd[j]; nn++;
   }
-  if(!nn){ $('cmp_t').innerHTML='<div class="chartmsg">Geen overlappende uren tussen meting en verwachting.</div>'; return; }
+  if(!nn){ cmpMsg('Geen overlappende uren tussen meting en verwachting.'); return; }
   const sgn=(v,d,u)=>(v>=0?'+':'−')+nl(Math.abs(v),d)+' '+u;
   $('cmp_dT').textContent=sgn(sT/nn,1,'°C'); $('cmp_dRH').textContent=sgn(sRH/nn,0,'%'); $('cmp_dVD').textContent=sgn(sVD/nn,1,'g/m³');
   $('cmp_note').textContent='Proef-perceel t.o.v. Open-Meteo · '+nn+' overlappende uren ('+MEAS_RANGE.start+' → '+MEAS_RANGE.end+')';
   const C={f:'#9aa7c2',p:'#e879b8',o:'#6fe3ff'};
-  const S=(f,p,o,w)=>[{color:C.f,dash:'5 4',data:f},{color:C.p,data:p},{color:C.o,w:1.6,op:.85,data:o}];
-  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0});
-  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0});
-  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1});
+  const S=(f,p,o)=>[{name:'verwacht',color:C.f,dash:'5 4',data:f},{name:'Proef',color:C.p,data:p},{name:'Onbehandeld',color:C.o,w:1.6,op:.85,data:o}];
+  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0,unit:' °C',id:'cmp_t'}); wireHover('cmp_t');
+  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0,unit:' %',id:'cmp_rh'}); wireHover('cmp_rh');
+  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1,unit:' g/m³',id:'cmp_vd'}); wireHover('cmp_vd');
 }
+function buildCmpFromFC(){
+  if(!FC.hourly||!FC.hourly.time) return false;
+  const idx={},t=FC.hourly.temperature_2m,rh=FC.hourly.relative_humidity_2m;
+  const vd=FC.hourly.vd_gm3?FC.hourly.vd_gm3:t.map((tt,i)=>(tt!=null&&rh[i]!=null)?vdGm3(tt,rh[i]):null);
+  FC.hourly.time.forEach((ts,i)=>{idx[ts]=i;});
+  if(!MEAS.some(m=>idx[m[0]]!=null)) return false;     // geen overlap met meting
+  CMP={time:FC.hourly.time,t,rh,vd,idx}; return true;
+}
+function cmpMsg(txt){ ['cmp_t','cmp_rh','cmp_vd'].forEach(id=>{ if($(id)) $(id).innerHTML='<div class="chartmsg">'+txt+'</div>'; }); }
 function compareLoad(){
-  $('cmp_t').innerHTML='<div class="chartmsg">Verwachting ophalen…</div>';
+  cmpMsg('Verwachting ophalen…');
   const u="https://api.open-meteo.com/v1/forecast?latitude="+MEAS_RANGE.lat+"&longitude="+MEAS_RANGE.lon+
     "&hourly=temperature_2m,relative_humidity_2m&start_date="+MEAS_RANGE.start+"&end_date="+MEAS_RANGE.end+"&timezone=Europe%2FAmsterdam";
   fetch(u).then(r=>r.json()).then(j=>{
-    if(!j.hourly) throw new Error('geen uurdata');
+    if(!j.hourly||!j.hourly.time) throw new Error('geen uurdata');
     const idx={},t=j.hourly.temperature_2m,rh=j.hourly.relative_humidity_2m,vd=[];
     j.hourly.time.forEach((ts,i)=>{idx[ts]=i; vd.push((t[i]!=null&&rh[i]!=null)?vdGm3(t[i],rh[i]):null);});
+    if(!MEAS.some(m=>idx[m[0]]!=null)) throw new Error('geen overlap met de meetperiode');
     CMP={time:j.hourly.time,t,rh,vd,idx}; renderCompare();
-  }).catch(e=>{ $('cmp_t').innerHTML='<div class="chartmsg">Kon de verwachting niet ophalen ('+e.message+'). In de preview kan dit geblokkeerd zijn; op de gepubliceerde site werkt het.</div>'; });
+  }).catch(e=>{
+    if(buildCmpFromFC()){ renderCompare(); }
+    else cmpMsg('Kon de verwachting niet ophalen ('+e.message+'). Klik bovenaan op <b>Ververs</b> (zodat het weerbericht geladen is) en open deze tab opnieuw.');
+  });
 }
 function parseCSV(text){
   const rows=[]; let i=0,field='',row=[],inq=false;
