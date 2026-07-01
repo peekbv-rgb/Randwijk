@@ -122,6 +122,14 @@
   .filebtn{display:inline-block; background:var(--accent); color:#10141f; font-weight:600; padding:8px 14px; border-radius:9px; cursor:pointer; font-size:14px}
   body[data-view="cmp"] .filebtn{color:#2a0c22}
   .filebtn input{display:none}
+  .difftab{display:flex; flex-direction:column; gap:2px; font-size:14px}
+  .difftab .dhead,.difftab .drow{display:grid; grid-template-columns:1.4fr 1fr 1fr 1.3fr .8fr; gap:8px; align-items:center; padding:8px 6px}
+  .difftab .dhead{color:var(--mut); font-size:11.5px; line-height:1.25; border-bottom:1px solid var(--line)}
+  .difftab .drow{border-bottom:1px solid var(--line)}
+  .difftab .drow span{color:var(--mut)}
+  .difftab .drow b{font-variant-numeric:tabular-nums; font-weight:600}
+  .verdict{margin-top:12px; padding:12px 14px; border-radius:10px; background:var(--bgA); border:1px solid var(--line); font-size:14px; line-height:1.5}
+  @media(max-width:560px){ .difftab .dhead{display:none} .difftab .drow{grid-template-columns:1fr 1fr; row-gap:2px} .difftab .drow span{grid-column:1/-1; color:var(--ink); font-weight:600; margin-top:4px} }
   .filebtn.ghost{background:transparent; border:1px solid var(--line); color:var(--mut); font-weight:500}
   body[data-view="cmp"] .filebtn.ghost{color:var(--mut)}
   .charthov{position:relative}
@@ -222,6 +230,11 @@
         <span><i class="shade"></i>nachtvenster 18–09 u</span>
       </div>
     </section>
+    <section class="card chartcard">
+      <h2>Temperatuur · afgelopen &amp; komende dagen (°C)</h2>
+      <div id="f_week"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend"><span><i style="background:#6fe3ff"></i>Temperatuur per uur (°C)</span><span>dag-labels op de x-as</span></div>
+    </section>
     <footer>
       <div style="margin-bottom:8px"><span class="pill">MAE ≈ 1,9 °C</span><span class="pill">ROC-AUC 0,98</span><span class="pill">Open-Meteo</span></div>
       Schat <em>uitstralingsvorst</em> op stationshoogte; geen vervanging voor een officiële waarschuwing,
@@ -278,6 +291,11 @@
       </div>
     </section>
     <section class="card chartcard">
+      <h2>VD · afgelopen &amp; komende dagen (g/m³)</h2>
+      <div id="v_week"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend"><span><i style="background:#ffc24b"></i>Vochtdeficit per uur (g/m³)</span><span>dag-labels op de x-as</span></div>
+    </section>
+    <section class="card chartcard">
       <h2>VD-kaart · vochtdeficit (temperatuur × RV)</h2>
       <div id="v_map"><div class="chartmsg">Weersbericht laden…</div></div>
       <div class="legend">
@@ -329,6 +347,11 @@
       </div>
     </section>
     <section class="card chartcard">
+      <h2>Relatieve vochtigheid · afgelopen &amp; komende dagen (%)</h2>
+      <div id="l_week"><div class="chartmsg">Weersbericht laden…</div></div>
+      <div class="legend"><span><i style="background:#67d29a"></i>RV per uur (%)</span><span>dag-labels op de x-as</span></div>
+    </section>
+    <section class="card chartcard">
       <h2>Mills-kaart · schurftinfectie (natduur × temperatuur)</h2>
       <div id="l_map"><div class="chartmsg">Weersbericht laden…</div></div>
       <div class="legend">
@@ -372,8 +395,8 @@
       <div id="cmp_t"><div class="chartmsg">Verwachting ophalen…</div></div>
       <div class="legend">
         <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht (Open-Meteo)</span>
-        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef (toren)</span>
-        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
       </div>
     </section>
     <section class="card chartcard">
@@ -381,8 +404,8 @@
       <div id="cmp_rh"><div class="chartmsg">…</div></div>
       <div class="legend">
         <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht</span>
-        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef</span>
-        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
       </div>
     </section>
     <section class="card chartcard">
@@ -390,8 +413,8 @@
       <div id="cmp_vd"><div class="chartmsg">…</div></div>
       <div class="legend">
         <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht</span>
-        <span><i class="curve" style="border-top-color:#e879b8"></i>Proef</span>
-        <span><i class="curve" style="border-top-color:#6fe3ff"></i>Onbehandeld</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
       </div>
     </section>
     <section class="card chartcard">
@@ -399,6 +422,54 @@
       <div id="cmp_p"><div class="chartmsg">…</div></div>
       <div class="legend">
         <span><i class="curve" style="border-top-color:#ff9d3c"></i>druk (uurpiek)</span>
+        <span><i class="curve dashed" style="border-top-color:#ff9d3c"></i>drempel "aan"</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Open-Meteo vs weerstation · waar zitten de verschillen?</h2>
+      <p class="sub" style="margin:2px 0 10px">Open-Meteo vergeleken met de <b>onbehandelde</b> meting (zonder toren) van het WolkyTolky-station —
+        de zuiverste maat voor hoe goed Open-Meteo het lokale weer benadert. Hiermee zie je of een eigen station nodig is.</p>
+      <div class="difftab">
+        <div class="dhead"><span>variabele</span><span>gem. verschil<br>(OM − station)</span><span>gem. afwijking</span><span>grootste afwijking</span><span>samenhang r</span></div>
+        <div class="drow"><span>Temperatuur</span><b id="om_tbias">—</b><b id="om_tmae">—</b><b id="om_tmax">—</b><b id="om_tr">—</b></div>
+        <div class="drow"><span>Relatieve vochtigheid</span><b id="om_rbias">—</b><b id="om_rmae">—</b><b id="om_rmax">—</b><b id="om_rr">—</b></div>
+        <div class="drow"><span>Vochtdeficit</span><b id="om_vbias">—</b><b id="om_vmae">—</b><b id="om_vmax">—</b><b id="om_vr">—</b></div>
+      </div>
+      <div class="verdict" id="om_verdict">—</div>
+    </section>
+    <section class="card chartcard">
+      <h2>Weekoverzicht · temperatuur (°C) — afgelopen &amp; komende dagen</h2>
+      <div id="cmp_week_t"><div class="chartmsg">Weerbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht (Open-Meteo)</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Weekoverzicht · VD (g/m³) — afgelopen &amp; komende dagen</h2>
+      <div id="cmp_week_vd"><div class="chartmsg">Weerbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht (Open-Meteo)</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Weekoverzicht · relatieve vochtigheid (%) — afgelopen &amp; komende dagen</h2>
+      <div id="cmp_week_rh"><div class="chartmsg">Weerbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve dashed" style="border-top-color:#9aa7c2"></i>verwacht (Open-Meteo)</span>
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Weekoverzicht · pompdruk (bar) — toren / beregening</h2>
+      <div id="cmp_week_p"><div class="chartmsg">Weerbericht laden…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#ff9d3c"></i>pompdruk (uurpiek, bar)</span>
         <span><i class="curve dashed" style="border-top-color:#ff9d3c"></i>drempel "aan"</span>
         <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
       </div>
@@ -632,11 +703,13 @@ async function fetchForecast(){
     const j=await r.json();
     FC.hourly=j.hourly; FC.daily=j.daily; FC.place=place;
     FC.hourly.vd_gm3=FC.hourly.temperature_2m.map((t,i)=>{const r=FC.hourly.relative_humidity_2m[i];return (t==null||r==null)?null:vdGm3(t,r);});
-    buildDaySelect(); applyCurrentView();
     stat.textContent="✓ "+place.name+" · Open-Meteo";
   }catch(e){
-    stat.classList.add('err'); stat.textContent="Geen verbinding — vul handmatig in";
+    stat.classList.add('err'); stat.textContent="Geen verbinding met Open-Meteo — klik op Ververs om opnieuw te proberen";
+    ['f_chart','v_chart','l_chart','f_week','v_week','l_week','cmp_t','cmp_rh','cmp_vd','cmp_p'].forEach(id=>{const el=$(id); if(el) el.innerHTML='<div class="chartmsg">Geen weerbericht geladen. Op de gepubliceerde site werkt dit; in de claude.ai-preview blokkeert de browser de weer-ophaalactie.</div>';});
+    return;
   }
+  buildDaySelect(); applyCurrentView(); renderCmpWeek();
 }
 function buildDaySelect(){
   const sel=$('daySel'), prev=sel.value; sel.innerHTML="";
@@ -655,6 +728,48 @@ function relabelDays(){
     o.textContent=(view==="frost"?"Nacht van ":"")+lbl;
   });
 }
+/* ===== Meerdaags overzicht (afgelopen dagen + vooruit, uit het weerbericht) ===== */
+const MND=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+function multiDayChart(id, kind){
+  const box=$(id); if(!box) return;
+  if(!FC.hourly){ box.innerHTML='<div class="chartmsg">Weerbericht laden…</div>'; return; }
+  const h=FC.hourly, time=h.time; let data,unit,dec,color,nm;
+  if(kind==='temp'){ data=h.temperature_2m; unit='°C'; dec=0; color='#6fe3ff'; nm='temp'; }
+  else if(kind==='rh'){ data=h.relative_humidity_2m; unit='%'; dec=0; color='#67d29a'; nm='RV'; }
+  else { data=h.vd_gm3||h.temperature_2m.map((t,i)=>vdGm3(t,h.relative_humidity_2m[i])); unit='g/m³'; dec=1; color='#ffc24b'; nm='VD'; }
+  const labels=time.map(ts=>ts.slice(8,10)+'-'+ts.slice(11,13)+'u');
+  const xticks=[]; time.forEach((ts,i)=>{ if(ts.slice(11,13)==='00') xticks.push({i,label:(+ts.slice(8,10))+' '+MND[+ts.slice(5,7)-1]}); });
+  box.innerHTML=cmpChart(labels,[{name:nm,color,data}],{decimals:dec,unit:' '+unit,id,xticks,yunit:unit});
+  wireHover(id);
+}
+function renderCmpWeek(){
+  const ids=['cmp_week_t','cmp_week_vd','cmp_week_rh']; if(!$(ids[0])) return;
+  if(!FC.hourly){ ids.forEach(id=>{const b=$(id); if(b)b.innerHTML='<div class="chartmsg">Weerbericht laden…</div>';}); return; }
+  const time=FC.hourly.time, omT=FC.hourly.temperature_2m, omRH=FC.hourly.relative_humidity_2m;
+  const omVD=FC.hourly.vd_gm3||omT.map((t,i)=>(t==null||omRH[i]==null)?null:vdGm3(t,omRH[i]));
+  const M={}; MEAS.forEach(m=>{M[m[0]]=m;});
+  const pT=[],oT=[],pRH=[],oRH=[],pVD=[],oVD=[],druk=[],onMask=[];
+  time.forEach(ts=>{ const m=M[ts];
+    if(m){ pT.push(m[1]); oT.push(m[2]); pRH.push(m[3]); oRH.push(m[4]);
+      pVD.push((m[1]!=null&&m[3]!=null)?vdGm3(m[1],m[3]):null); oVD.push((m[2]!=null&&m[4]!=null)?vdGm3(m[2],m[4]):null); }
+    else { pT.push(null);oT.push(null);pRH.push(null);oRH.push(null);pVD.push(null);oVD.push(null); }
+    const dr=(m&&m.length>5)?m[5]:null; druk.push(dr); onMask.push(dr!=null&&dr>=DRUK_ON);
+  });
+  const labels=time.map(ts=>ts.slice(8,10)+'-'+ts.slice(11,13)+'u');
+  const xticks=[]; time.forEach((ts,i)=>{ if(ts.slice(11,13)==='00') xticks.push({i,label:(+ts.slice(8,10))+' '+MND[+ts.slice(5,7)-1]}); });
+  const C={f:'#9aa7c2',p:'#4ade80',o:'#ff5d6c'};
+  const draw=(id,om,pp,oo,unit,dec)=>{ if(!$(id))return;
+    const series=[{name:'verwacht',color:C.f,dash:'5 4',data:om},{name:'Proef',color:C.p,data:pp},{name:'Onbehandeld',color:C.o,w:1.6,data:oo}];
+    $(id).innerHTML=cmpChart(labels,series,{decimals:dec,unit:' '+unit,id,xticks,yunit:unit}); wireHover(id);
+  };
+  draw('cmp_week_t',omT,pT,oT,'°C',0);
+  draw('cmp_week_vd',omVD,pVD,oVD,'g/m³',1);
+  draw('cmp_week_rh',omRH,pRH,oRH,'%',0);
+  if($('cmp_week_p')){
+    if(!druk.some(v=>v!=null)) $('cmp_week_p').innerHTML='<div class="chartmsg">Geen pompdruk in deze meting.</div>';
+    else { $('cmp_week_p').innerHTML=cmpChart(labels,[{name:'pompdruk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'cmp_week_p',xticks,yunit:'bar',onMask,thresh:DRUK_ON}); wireHover('cmp_week_p'); }
+  }
+}
 function applyCurrentView(){
   if(!FC.hourly) return;
   const D=$('daySel').value; if(!D) return;
@@ -670,6 +785,7 @@ function applyFrost(D){
   $('f_d').value=D; $('f_af').classList.remove('hidden');
   predictFrost();                          // labels + zet basiswaarden
   const r=renderFrostChart(D);             // tekent curve + dip op de lijn
+  multiDayChart('f_week','temp');
   const fp=frostPredict(D);                // kans uit het model
   if(r) showFrost(r.min, fp?fp.prob:0, 'laagste rond '+pad2(r.hour)+':00 · uit weersbericht');
 }
@@ -683,6 +799,7 @@ function applyVd(D){
   predictVd();
   const r=renderVdChart(D);
   renderVdMap(D, r);
+  multiDayChart('v_week','vd');
   if(r) showVd(r.peak, 'verwachte dagpiek · rond '+pad2(r.hour)+':00 (uit weersbericht)');
   $('v_h1').textContent='Hoe hoog wordt de VD '+relDay(D)+'?';
 }
@@ -994,6 +1111,7 @@ function applyLeaf(D){
   $('l_status').style.background='color-mix(in srgb, '+sc.col+' 12%, transparent)';
   $('l_statusTxt').innerHTML='<b>'+sc.head+'</b><br>'+sc.body;
   renderLeafChart(D); renderMillsMap(D,{hours:r.spell,temp:r.spellTemp});
+  multiDayChart('l_week','rh');
   $('l_h1').textContent='Bladnat & schurftdruk · '+relDay(D);
 }
 /* ===== Meting vs verwachting (toren-effect) ===== */
@@ -1032,7 +1150,10 @@ function cmpChart(labels, series, opt){
   let grid="",yl=""; for(let k=0;k<=8;k++){const v=vmin+(vmax-vmin)*(1-k/8),y=mt+k/8*ph;
     grid+=`<line x1="${ml}" y1="${y.toFixed(1)}" x2="${ml+pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
     yl+=`<text x="${ml-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" class="ax">${nl(v,dec)}</text>`;}
-  let xl=""; const step=Math.max(1,Math.round(n/16)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`;}
+  let xl="";
+  if(opt.xticks){ opt.xticks.forEach(tk=>{ if(tk.i>=0&&tk.i<n) xl+=`<text x="${X(tk.i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${tk.label}</text>`; }); }
+  else { const step=Math.max(1,Math.round(n/16)); for(let i=0;i<n;i+=step){xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" class="ax">${labels[i]}</text>`; } }
+  const yunit=opt.yunit?`<text x="${ml-6}" y="${(mt-5).toFixed(1)}" text-anchor="end" class="ax" style="font-weight:700;fill:var(--ink)">${opt.yunit}</text>`:'';
   const colW=n>1?pw/(n-1):pw;
   let bands=""; if(opt.onMask){for(let i=0;i<n;i++){if(opt.onMask[i]){const x0=Math.max(ml,X(i)-colW/2),x1=Math.min(ml+pw,X(i)+colW/2);
     bands+=`<rect x="${x0.toFixed(1)}" y="${mt}" width="${(x1-x0).toFixed(1)}" height="${ph}" fill="#ff9d3c" opacity="0.22"/>`;}}}
@@ -1045,7 +1166,7 @@ function cmpChart(labels, series, opt){
     hits+=`<rect class="hit" x="${hx.toFixed(1)}" y="${mt}" width="${colW.toFixed(1)}" height="${ph}"/>`;}
   if(opt.id) HOV[opt.id]={ml,pw,W,H,n,dec,unit,labels,series};
   const cross=`<line class="cross" x1="0" y1="${mt}" x2="0" y2="${mt+ph}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,var(--accent) 12%, transparent)}</style>${bands}${grid}${thr}${paths}${yl}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img"><style>.ax{font:500 11px "JetBrains Mono",monospace;fill:var(--mut)}.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:color-mix(in srgb,var(--accent) 12%, transparent)}</style>${bands}${grid}${thr}${paths}${yl}${yunit}${xl}<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="var(--line)" stroke-width="1"/>${cross}${hits}</svg>`;
 }
 function cmpPeriodText(){
   const MN=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
@@ -1060,14 +1181,39 @@ function updateCmpMeta(){
   const st=$('cmpFileStat'); if(st && st.textContent.indexOf('Geladen')<0 && st.textContent.indexOf('Fout')<0 && st.textContent.indexOf('Inlezen')<0)
     st.textContent='meting: '+t+' ('+MEAS.length+' u)';
 }
+function diffStats(om, st){
+  let n=0,sB=0,sA=0,mx=-1,mi=-1,sx=0,sy=0,sxx=0,syy=0,sxy=0;
+  for(let i=0;i<om.length;i++){const a=om[i],b=st[i]; if(a==null||b==null||!isFinite(a)||!isFinite(b))continue;
+    const d=a-b; sB+=d; sA+=Math.abs(d); if(Math.abs(d)>mx){mx=Math.abs(d);mi=i;} sx+=a;sy+=b;sxx+=a*a;syy+=b*b;sxy+=a*b; n++;}
+  if(!n) return null;
+  const bias=sB/n, mae=sA/n, cov=sxy/n-(sx/n)*(sy/n), vx=sxx/n-(sx/n)**2, vy=syy/n-(sy/n)**2;
+  return {n,bias,mae,maxAbs:mx,maxIdx:mi,r:(vx>0&&vy>0)?cov/Math.sqrt(vx*vy):NaN};
+}
+function fillOmStats(labels,ft,ot,frh,orh,fvd,ovd){
+  const sgn=(v,d)=>(v>=0?'+':'−')+nl(Math.abs(v),d);
+  const set=(pre,S,d,u)=>{ if(!S){['bias','mae','max','r'].forEach(k=>{const el=$('om_'+pre+k); if(el)el.textContent='—';}); return; }
+    if($('om_'+pre+'bias'))$('om_'+pre+'bias').textContent=sgn(S.bias,d)+' '+u;
+    if($('om_'+pre+'mae'))$('om_'+pre+'mae').textContent=nl(S.mae,d)+' '+u;
+    if($('om_'+pre+'max'))$('om_'+pre+'max').textContent=nl(S.maxAbs,d)+' '+u+' · '+labels[S.maxIdx];
+    if($('om_'+pre+'r'))$('om_'+pre+'r').textContent=isNaN(S.r)?'—':nl(S.r,2); };
+  const tS=diffStats(ft,ot), rS=diffStats(frh,orh), vS=diffStats(fvd,ovd);
+  set('t',tS,1,'°C'); set('r',rS,0,'%'); set('v',vS,1,'g/m³');
+  const V=$('om_verdict'); if(!V) return;
+  if(!tS){ V.textContent='Geen onbehandelde referentie in deze meting — laad een CSV met de kolom "Onbehandeld Temp/RH" om Open-Meteo met het station te vergelijken.'; return; }
+  let oordeel;
+  if(tS.mae<1.0 && (!rS||rS.mae<5)) oordeel='Open-Meteo volgt het station <b>goed</b>. Voor de algemene weersinschatting (temperatuur/VD-verloop overdag) is Open-Meteo grotendeels toereikend en is een eigen station niet strikt noodzakelijk.';
+  else if(tS.mae<2.0) oordeel='<b>Redelijke</b> overeenkomst, met merkbare afwijkingen (vooral rond de piek/dal-momenten). Open-Meteo is bruikbaar voor trends, maar een lokaal station voegt precisie toe waar het telt.';
+  else oordeel='<b>Duidelijke afwijkingen</b> tussen Open-Meteo en het station. Voor betrouwbare lokale sturing is een eigen weerstation aan te raden.';
+  V.innerHTML=oordeel+'<br><span class="sub">Let op: voor <b>nachtvorst</b> (hyperlokaal) en het <b>toren-effect</b> blijft een lokaal station onmisbaar — die verschillen zie je niet in Open-Meteo. De vergelijking gebruikt gewasnabije sensoren (Onbehandeld) t.o.v. Open-Meteo op 2 m; systematische bias kan deels daardoor komen.</span>';
+}
 function renderCompare(){
   updateCmpMeta();
   if(!CMP){ compareLoad(); return; }
-  const labels=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[],druk=[],onMask=[];
+  const labels=[],tsArr=[],ft=[],pt=[],ot=[],frh=[],prh=[],orh=[],fvd=[],pvd=[],ovd=[],druk=[],onMask=[];
   let sT=0,sRH=0,sVD=0,nn=0, drukMax=null, onUren=0;
   for(const m of MEAS){
     const ts=m[0], j=CMP.idx[ts]; if(j==null||CMP.t[j]==null) continue;
-    labels.push(ts.slice(8,10)+"-"+ts.slice(11,13)+"u");
+    labels.push(ts.slice(8,10)+"-"+ts.slice(11,13)+"u"); tsArr.push(ts);
     ft.push(CMP.t[j]); pt.push(m[1]); ot.push(m[2]);
     frh.push(CMP.rh[j]); prh.push(m[3]); orh.push(m[4]);
     const pV=vdGm3(m[1],m[3]), oV=(m[2]!=null&&m[4]!=null)?vdGm3(m[2],m[4]):null;
@@ -1082,15 +1228,18 @@ function renderCompare(){
   $('cmp_dT').textContent=sgn(sT/nn,1,'°C'); $('cmp_dRH').textContent=sgn(sRH/nn,0,'%'); $('cmp_dVD').textContent=sgn(sVD/nn,1,'g/m³');
   if($('cmp_dDruk')) $('cmp_dDruk').textContent = drukMax!=null ? ('piek '+nl(drukMax,1)+' bar · '+onUren+' u ≥ '+nl(DRUK_ON,1)+' bar') : 'geen drukdata';
   $('cmp_note').textContent='Proef-perceel t.o.v. Open-Meteo · '+nn+' overlappende uren ('+MEAS_RANGE.start+' → '+MEAS_RANGE.end+')';
-  const C={f:'#9aa7c2',p:'#e879b8',o:'#6fe3ff'};
+  const C={f:'#9aa7c2',p:'#4ade80',o:'#ff5d6c'};
+  const xticks=[]; tsArr.forEach((ts,i)=>{ if(ts.slice(11,13)==='00') xticks.push({i,label:(+ts.slice(8,10))+' '+MND[+ts.slice(5,7)-1]}); });
+  if(xticks.length<2 && tsArr.length){ const step=Math.max(1,Math.round(tsArr.length/8)); xticks.length=0; for(let i=0;i<tsArr.length;i+=step) xticks.push({i,label:labels[i]}); }
   const S=(f,p,o)=>[{name:'verwacht',color:C.f,dash:'5 4',data:f},{name:'Proef',color:C.p,data:p},{name:'Onbehandeld',color:C.o,w:1.6,op:.85,data:o}];
-  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0,unit:' °C',id:'cmp_t',onMask}); wireHover('cmp_t');
-  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0,unit:' %',id:'cmp_rh',onMask}); wireHover('cmp_rh');
-  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1,unit:' g/m³',id:'cmp_vd',onMask}); wireHover('cmp_vd');
+  $('cmp_t').innerHTML=cmpChart(labels,S(ft,pt,ot),{decimals:0,unit:' °C',id:'cmp_t',onMask,xticks,yunit:'°C'}); wireHover('cmp_t');
+  $('cmp_rh').innerHTML=cmpChart(labels,S(frh,prh,orh),{decimals:0,unit:' %',id:'cmp_rh',onMask,xticks,yunit:'%'}); wireHover('cmp_rh');
+  $('cmp_vd').innerHTML=cmpChart(labels,S(fvd,pvd,ovd),{decimals:1,unit:' g/m³',id:'cmp_vd',onMask,xticks,yunit:'g/m³'}); wireHover('cmp_vd');
   if($('cmp_p')){
     if(drukMax==null) $('cmp_p').innerHTML='<div class="chartmsg">Geen drukkolom in deze meting.</div>';
-    else { $('cmp_p').innerHTML=cmpChart(labels,[{name:'druk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'cmp_p',onMask,thresh:DRUK_ON}); wireHover('cmp_p'); }
+    else { $('cmp_p').innerHTML=cmpChart(labels,[{name:'druk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'cmp_p',onMask,thresh:DRUK_ON,xticks,yunit:'bar'}); wireHover('cmp_p'); }
   }
+  fillOmStats(labels,ft,ot,frh,orh,fvd,ovd);
 }
 function buildCmpFromFC(){
   if(!FC.hourly||!FC.hourly.time) return false;
@@ -1218,7 +1367,7 @@ function setView(v){
   $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabCmp').classList.toggle('on',v==="cmp");$('tabToday').classList.toggle('on',v==="today");
   if(FC.hourly){relabelDays();}
   if(v==="today"){ renderToday($('daySel').value || new Date().toLocaleDateString('sv-SE')); }
-  else if(v==="cmp"){ renderCompare(); }
+  else if(v==="cmp"){ renderCompare(); renderCmpWeek(); }
   else if(FC.hourly){ applyCurrentView(); }
 }
 $('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabCmp').onclick=()=>setView("cmp"); $('tabToday').onclick=()=>setView("today");
