@@ -140,16 +140,16 @@
   .pill{display:inline-block; font:500 11px "JetBrains Mono",monospace; color:var(--mut); border:1px solid var(--line); border-radius:999px; padding:3px 10px; margin:2px 4px 2px 0}
 </style>
 </head>
-<body data-view="frost">
+<body data-view="vd">
 <div class="wrap">
   <div class="topbar">
     <div class="brand">FRC Randwijk · agrometeo</div>
     <div class="seg">
-      <button id="tabFrost" class="on">Nachtvorst</button>
-      <button id="tabVd">VD-piek</button>
-      <button id="tabLeaf">Bladnat</button>
+      <button id="tabVd" class="on">VD-piek</button>
       <button id="tabCmp">Toren-effect</button>
       <button id="tabToday">Klopt het?</button>
+      <button id="tabFrost">Nachtvorst</button>
+      <button id="tabLeaf">Bladnat</button>
     </div>
   </div>
 
@@ -1111,12 +1111,20 @@ function compareLoad(){
     else cmpMsg('Kon de verwachting niet ophalen ('+e.message+'). Klik bovenaan op <b>Ververs</b> (zodat het weerbericht geladen is) en open deze tab opnieuw.');
   });
 }
-function parseCSV(text){
+function detectDelim(text){
+  const firstLine=(text.split('\n').find(l=>l.trim().length)||'');
+  const c=(firstLine.match(/,/g)||[]).length, s=(firstLine.match(/;/g)||[]).length, t=(firstLine.match(/\t/g)||[]).length;
+  if(s>=c && s>=t && s>0) return ';';
+  if(t>=c && t>=s && t>0) return '\t';
+  return ',';
+}
+function parseCSV(text, delim){
+  delim=delim||detectDelim(text);
   const rows=[]; let i=0,field='',row=[],inq=false;
   const pushF=()=>{row.push(field);field='';}, pushR=()=>{rows.push(row);row=[];};
   while(i<text.length){const ch=text[i];
     if(inq){ if(ch=='"'){ if(text[i+1]=='"'){field+='"';i++;} else inq=false; } else field+=ch; }
-    else { if(ch=='"')inq=true; else if(ch==',')pushF(); else if(ch=='\n'){pushF();pushR();} else if(ch!='\r')field+=ch; }
+    else { if(ch=='"')inq=true; else if(ch==delim)pushF(); else if(ch=='\n'){pushF();pushR();} else if(ch!='\r')field+=ch; }
     i++;
   }
   if(field.length||row.length){pushF();pushR();}
@@ -1126,16 +1134,39 @@ function loadCsvFile(file){
   if(!file) return; const st=$('cmpFileStat'); st.textContent='Inlezen…';
   const rd=new FileReader();
   rd.onload=()=>{ try{
-    const rows=parseCSV(rd.result); if(rows.length<2) throw new Error('leeg bestand');
-    const hdr=rows[0].map(s=>s.trim()), col=n=>hdr.indexOf(n);
-    const ci={dt:col('Date and time'),pt:col('Proef Temp'),ot:col('Onbehandeld Temp'),
-              prh:col('Proef RH'),orh:col('Onbehandeld RH'),druk:col('Druk'),lat:col('Latitude'),lon:col('Longitude')};
-    if(ci.dt<0||ci.pt<0||ci.prh<0) throw new Error('kolommen "Date and time"/"Proef Temp"/"Proef RH" niet gevonden');
-    const num=v=>{const f=parseFloat(v);return isNaN(f)?null:f;};
+    const rows=parseCSV(rd.result); if(rows.length<2) throw new Error('leeg of onleesbaar bestand');
+    const norm=s=>String(s).toLowerCase().replace(/["']/g,'').replace(/\s+/g,' ').trim();
+    const DT=['date and time','datetime','date/time','datum en tijd','datum/tijd','timestamp','tijdstip','date','datum','tijd'];
+    let hr=0; for(let r=0;r<Math.min(rows.length,15);r++){ if(rows[r].some(c=>DT.includes(norm(c)))){hr=r;break;} }
+    const hdr=rows[hr].map(norm);
+    const find=cands=>{ for(const c of cands){const k=hdr.indexOf(c); if(k>=0)return k;}
+      for(let k=0;k<hdr.length;k++){ if(cands.some(c=>hdr[k].includes(c))) return k; } return -1; };
+    const ci={
+      dt:find(DT),
+      pt:find(['proef temp','proef temperatuur','proef temperature','temperatuur proef','temp proef']),
+      ot:find(['onbehandeld temp','onbehandeld temperatuur','controle temp','referentie temp','temp onbehandeld']),
+      prh:find(['proef rh','proef rv','proef vochtigheid','proef humidity','vochtigheid proef','rh proef']),
+      orh:find(['onbehandeld rh','onbehandeld rv','controle rh','referentie rh','rh onbehandeld']),
+      druk:find(['druk','pressure','waterdruk','systeemdruk']),
+      lat:find(['latitude','breedtegraad','lat']), lon:find(['longitude','lengtegraad','lng','lon'])
+    };
+    if(ci.dt<0||ci.pt<0||ci.prh<0){
+      const found=rows[hr].map(s=>String(s).trim()).filter(x=>x).join(' · ')||'(geen)';
+      throw new Error('kolommen niet herkend. Gevonden koppen: '+found);
+    }
+    const num=v=>{ if(v==null) return null; let s=String(v).trim().replace(/\s/g,''); if(!s) return null;
+      if(s.indexOf('.')<0 && s.indexOf(',')>=0) s=s.replace(',','.'); else s=s.replace(/,(?=\d{3}\b)/g,'');
+      const f=parseFloat(s); return isNaN(f)?null:f; };
+    const parseHour=s=>{ s=String(s).trim(); if(!s) return null;
+      let m=s.match(/(\d{1,4})[-\/.](\d{1,2})[-\/.](\d{1,4})[ T]+(\d{1,2}):(\d{2})/);
+      if(m){ let a=+m[1],b=+m[2],c=+m[3],H=+m[4],Y,Mo,D;
+        if(a>31){Y=a;Mo=b;D=c;} else {D=a;Mo=b;Y=c;} if(Y<100)Y+=2000;
+        return Y+'-'+pad2(Mo)+'-'+pad2(D)+'T'+pad2(H)+':00'; }
+      const iso=s.replace(' ','T'); return /^\d{4}-\d{2}-\d{2}T\d{2}/.test(iso)?iso.slice(0,13)+':00':null; };
     const inb=(v,lo,hi)=>(v==null||v<lo||v>hi)?null:v;
     const buck={},lats=[],lons=[];
-    for(let r=1;r<rows.length;r++){const row=rows[r]; if(!row[ci.dt]) continue;
-      const key=row[ci.dt].trim().replace(' ','T').slice(0,13)+':00';
+    for(let r=hr+1;r<rows.length;r++){const row=rows[r]; if(!row[ci.dt]) continue;
+      const key=parseHour(row[ci.dt]); if(!key) continue;
       const pt=inb(num(row[ci.pt]),-30,45), ot=ci.ot>=0?inb(num(row[ci.ot]),-30,45):null;
       const prh=inb(num(row[ci.prh]),1,100), orh=ci.orh>=0?inb(num(row[ci.orh]),1,100):null;
       const dr=ci.druk>=0?inb(num(row[ci.druk]),0,50):null;
@@ -1149,7 +1180,7 @@ function loadCsvFile(file){
       +(b.pt/b.ptn).toFixed(1), b.otn?+(b.ot/b.otn).toFixed(1):null,
       Math.round(b.prh/b.prhn), b.orhn?Math.round(b.orh/b.orhn):null,
       b.druk!=null?+b.druk.toFixed(1):null]); });
-    if(!out.length) throw new Error('geen geldige uurwaarden gevonden');
+    if(!out.length) throw new Error('geen geldige uurwaarden gevonden (controleer datum/tijd-formaat)');
     MEAS=out;
     // locatie vast op het station (de coördinaten in de export zijn onbetrouwbaar / bevatten GPS-glitches)
     MEAS_RANGE={start:out[0][0].slice(0,10), end:out[out.length-1][0].slice(0,10),
@@ -1183,7 +1214,7 @@ $('f_d').addEventListener('input',predictFrost); $('v_d').addEventListener('inpu
   const y=new Date().getFullYear();
   $('f_d').value=new Date(y,3,15).toISOString().slice(0,10);
   $('v_d').value=new Date(y,5,15).toISOString().slice(0,10);
-  predictFrost(); setVdMode("fc"); setView("frost");
+  predictFrost(); setVdMode("fc"); setView("vd");
   buildThermoTicks();
   fetchForecast();
 })();
