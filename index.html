@@ -122,6 +122,8 @@
   .filebtn{display:inline-block; background:var(--accent); color:#10141f; font-weight:600; padding:8px 14px; border-radius:9px; cursor:pointer; font-size:14px}
   body[data-view="cmp"] .filebtn{color:#2a0c22}
   .filebtn input{display:none}
+  .filebtn.ghost{background:transparent; border:1px solid var(--line); color:var(--mut); font-weight:500}
+  body[data-view="cmp"] .filebtn.ghost{color:var(--mut)}
   .charthov{position:relative}
   .charthov .tip{position:absolute; pointer-events:none; display:none; background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font:500 12px/1.5 Inter,system-ui,sans-serif; color:var(--ink); box-shadow:0 8px 22px -10px var(--shadow); white-space:nowrap; z-index:6}
   .legend i.curve{width:20px; height:0; border-top:2.4px solid var(--ink)}
@@ -353,6 +355,7 @@
          <b>Onbehandeld</b> = referentie, <b>verwacht</b> = Open-Meteo.</p>
       <div class="filerow">
         <label class="filebtn">Kies CSV-bestand<input id="cmpFile" type="file" accept=".csv,text/csv"></label>
+        <button id="cmpReset" class="filebtn ghost" type="button">↺ voorbeelddata</button>
         <span class="stat" id="cmpFileStat">ingebakken meting: 26–29 jun 2026 (77 u)</span>
       </div>
     </header>
@@ -531,6 +534,8 @@ let MEAS=[["2026-06-26T10:00",25.7,22.8,45,51,1.0],
 let MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
 let CMP=null;
 const DRUK_ON=1.5;   /* bar — drempel waarboven we de toren/beregening als 'aan' markeren */
+const MEAS_KEY='agrometeo_meas_v1';                    /* onthoudt de laatst geladen CSV */
+const MEAS_BAKED=MEAS.slice(), MEAS_RANGE_BAKED=Object.assign({},MEAS_RANGE);
 
 const $=id=>document.getElementById(id);
 const svp=T=>0.6108*Math.exp(17.27*T/(T+237.3));
@@ -1186,11 +1191,26 @@ function loadCsvFile(file){
     MEAS_RANGE={start:out[0][0].slice(0,10), end:out[out.length-1][0].slice(0,10),
       lat:MEAS_RANGE.lat, lon:MEAS_RANGE.lon, place:MEAS_RANGE.place};
     CMP=null;
+    try{ localStorage.setItem(MEAS_KEY, JSON.stringify({meas:MEAS,range:MEAS_RANGE})); }catch(e){}
     st.textContent='Geladen: '+out.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
     renderCompare();
   }catch(err){ st.textContent='Fout: '+err.message; } };
   rd.onerror=()=>{ st.textContent='Kon bestand niet lezen.'; };
   rd.readAsText(file);
+}
+function restoreMeas(){   /* haalt de laatst geladen CSV terug uit de browseropslag */
+  try{ const raw=localStorage.getItem(MEAS_KEY); if(!raw) return false;
+    const o=JSON.parse(raw); if(!o||!o.meas||!o.meas.length) return false;
+    MEAS=o.meas; MEAS_RANGE=o.range; CMP=null;
+    if($('cmpFileStat')) $('cmpFileStat').textContent='Laatst geladen: '+MEAS.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
+    return true;
+  }catch(e){ return false; }
+}
+function resetMeas(){     /* terug naar de ingebakken voorbeelddata */
+  MEAS=MEAS_BAKED.slice(); MEAS_RANGE=Object.assign({},MEAS_RANGE_BAKED); CMP=null;
+  try{ localStorage.removeItem(MEAS_KEY); }catch(e){}
+  if($('cmpFileStat')) $('cmpFileStat').textContent='voorbeelddata: '+cmpPeriodText()+' ('+MEAS.length+' u)';
+  renderCompare();
 }
 function setView(v){
   document.body.dataset.view=v;
@@ -1205,6 +1225,7 @@ $('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd")
 $('refresh').onclick=fetchForecast;
 $('daySel').onchange=applyCurrentView;
 $('cmpFile').onchange=e=>loadCsvFile(e.target.files[0]);
+$('cmpReset').onclick=resetMeas;
 $('loc').addEventListener('keydown',e=>{if(e.key==="Enter")fetchForecast();});
 document.querySelectorAll('#viewFrost input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('f_af').classList.add('hidden');predictFrost();}));
 document.querySelectorAll('#viewVd input[type=range]').forEach(el=>el.addEventListener('input',()=>{$('v_af').classList.add('hidden');predictVd();}));
@@ -1214,7 +1235,7 @@ $('f_d').addEventListener('input',predictFrost); $('v_d').addEventListener('inpu
   const y=new Date().getFullYear();
   $('f_d').value=new Date(y,3,15).toISOString().slice(0,10);
   $('v_d').value=new Date(y,5,15).toISOString().slice(0,10);
-  predictFrost(); setVdMode("fc"); setView("vd");
+  predictFrost(); setVdMode("fc"); restoreMeas(); setView("vd");
   buildThermoTicks();
   fetchForecast();
 })();
