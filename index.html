@@ -34,6 +34,11 @@
     --bg:#160a14; --bg2:#22101d; --panel:#2a1426; --line:#48243f;
     --accent:#e879b8; --field:#160a13; --bgA:#3a1030; --bgB:#2a1228;
   }
+  body[data-view="toren"]{
+    --ink:#eaf7ee; --mut:#a5c3ab; --shadow:rgba(0,0,0,.45);
+    --bg:#0a1510; --bg2:#0f2018; --panel:#132a1f; --line:#214735;
+    --accent:#4ade80; --field:#0a160f; --bgA:#123626; --bgB:#0f2a1f;
+  }
   *{box-sizing:border-box} html,body{margin:0}
   body{
     background:
@@ -129,6 +134,13 @@
   .difftab .drow span{color:var(--mut)}
   .difftab .drow b{font-variant-numeric:tabular-nums; font-weight:600}
   .verdict{margin-top:12px; padding:12px 14px; border-radius:10px; background:var(--bgA); border:1px solid var(--line); font-size:14px; line-height:1.5}
+  .vdc{display:flex; flex-direction:column; font-size:14px}
+  .vdc .r{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:8px; padding:7px 6px; border-bottom:1px solid var(--line); align-items:center}
+  .vdc .r.h{color:var(--mut); font-size:11.5px; line-height:1.25}
+  .vdc .r.tot{font-weight:700; border-bottom:none}
+  .vdc .r span:first-child{color:var(--mut)}
+  .vdc .r.tot span:first-child{color:var(--ink)}
+  .vdc .r b{font-variant-numeric:tabular-nums; font-weight:600}
   @media(max-width:560px){ .difftab .dhead{display:none} .difftab .drow{grid-template-columns:1fr 1fr; row-gap:2px} .difftab .drow span{grid-column:1/-1; color:var(--ink); font-weight:600; margin-top:4px} }
   .filebtn.ghost{background:transparent; border:1px solid var(--line); color:var(--mut); font-weight:500}
   body[data-view="cmp"] .filebtn.ghost{color:var(--mut)}
@@ -157,6 +169,7 @@
     <div class="seg">
       <button id="tabVd" class="on">VD-piek</button>
       <button id="tabCmp">Toren-effect</button>
+      <button id="tabToren">Torenwerking</button>
       <button id="tabToday">Klopt het?</button>
       <button id="tabFrost">Nachtvorst</button>
       <button id="tabLeaf">Bladnat</button>
@@ -481,6 +494,80 @@
     </footer>
   </div>
 
+  <!-- ============ TORENWERKING (proef vs onbehandeld) ============ -->
+  <div class="view" id="viewToren">
+    <header>
+      <h1>Torenwerking · proef (toren) vs onbehandeld</h1>
+      <p>Directe vergelijking van de twee proefpercelen: <b style="color:#4ade80">Proef</b> (mét toren) tegenover
+         <b style="color:#ff5d6c">Onbehandeld</b> (referentie). Zelfde locatie en periode, zónder Open-Meteo ertussen —
+         dit isoleert het <b>zuivere effect van de toren</b>. De oranje band markeert wanneer de pomp/toren aan stond.</p>
+    </header>
+    <section class="card">
+      <h2>Gemiddeld verschil · Proef − Onbehandeld</h2>
+      <div class="vrow"><span>Temperatuur</span><b id="tw_dT">—</b></div>
+      <div class="vrow"><span>Relatieve vochtigheid</span><b id="tw_dRH">—</b></div>
+      <div class="vrow"><span>Vochtdeficit</span><b id="tw_dVD">—</b></div>
+      <div class="vrow"><span>Pompdruk / toren</span><b id="tw_dDruk">—</b></div>
+      <div class="sub" id="tw_note" style="margin-top:8px">Positief = proef (toren) hoger dan onbehandeld</div>
+    </section>
+    <section class="card">
+      <h2>Waar en hoe groot is het toren-effect?</h2>
+      <div class="difftab">
+        <div class="dhead"><span>variabele</span><span>gem. verschil<br>(Proef − Onbeh.)</span><span>gem. afwijking</span><span>grootste verschil</span><span>samenhang r</span></div>
+        <div class="drow"><span>Temperatuur</span><b id="tw_tbias">—</b><b id="tw_tmae">—</b><b id="tw_tmax">—</b><b id="tw_tr">—</b></div>
+        <div class="drow"><span>Relatieve vochtigheid</span><b id="tw_rbias">—</b><b id="tw_rmae">—</b><b id="tw_rmax">—</b><b id="tw_rr">—</b></div>
+        <div class="drow"><span>Vochtdeficit</span><b id="tw_vbias">—</b><b id="tw_vmae">—</b><b id="tw_vmax">—</b><b id="tw_vr">—</b></div>
+      </div>
+      <div class="verdict" id="tw_verdict">—</div>
+    </section>
+    <section class="card">
+      <h2>Uren onder VD 10 g/m³ · per dag en totaal</h2>
+      <p class="sub" style="margin:2px 0 10px">Aantal uren dat het vochtdeficit onder 10 g/m³ bleef (vochtig genoeg / lage droogtestress), per perceel.
+        Zo zie je of de toren meer of minder "gunstige" uren oplevert dan de referentie.</p>
+      <div id="tw_vdcount"><div class="chartmsg">…</div></div>
+    </section>
+    <section class="card chartcard">
+      <h2>Temperatuur (°C)</h2>
+      <div id="tw_t"><div class="chartmsg">Geen meetdata — laad een CSV in de Toren-effect-tab.</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef (toren)</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Relatieve vochtigheid (%)</h2>
+      <div id="tw_rh"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Vochtdeficit (g/m³)</h2>
+      <div id="tw_vd"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#4ade80"></i>Proef</span>
+        <span><i class="curve" style="border-top-color:#ff5d6c"></i>Onbehandeld</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
+      </div>
+    </section>
+    <section class="card chartcard">
+      <h2>Pompdruk (bar) · toren / beregening</h2>
+      <div id="tw_p"><div class="chartmsg">…</div></div>
+      <div class="legend">
+        <span><i class="curve" style="border-top-color:#ff9d3c"></i>pompdruk (uurpiek, bar)</span>
+        <span><i class="curve dashed" style="border-top-color:#ff9d3c"></i>drempel "aan"</span>
+        <span><i class="cband" style="background:#ff9d3c;opacity:.4"></i>toren aan</span>
+      </div>
+    </section>
+    <footer>
+      Zuiver toren-effect uit de meting (Proef vs Onbehandeld). Laad je meetbestand via de knop in de
+      Toren-effect-tab; deze analyse gebruikt dezelfde data en werkt ook zonder weerbericht.
+    </footer>
+  </div>
+
   <div class="view" id="viewToday">
     <header>
       <h1>Klopt de voorspelling?</h1>
@@ -605,6 +692,7 @@ let MEAS=[["2026-06-26T10:00",25.7,22.8,45,51,1.0],
 let MEAS_RANGE={start:"2026-06-26",end:"2026-06-29",lat:51.9372,lon:5.7001,place:"Catyra · FRC Randwijk (toren)"};
 let CMP=null;
 const DRUK_ON=1.5;   /* bar — drempel waarboven we de toren/beregening als 'aan' markeren */
+const VD_LO=10;      /* g/m³ — grens 'onder VD 10' (vochtig genoeg / lage stress) */
 const MEAS_KEY='agrometeo_meas_v1';                    /* onthoudt de laatst geladen CSV */
 const MEAS_BAKED=MEAS.slice(), MEAS_RANGE_BAKED=Object.assign({},MEAS_RANGE);
 
@@ -768,6 +856,54 @@ function renderCmpWeek(){
   if($('cmp_week_p')){
     if(!druk.some(v=>v!=null)) $('cmp_week_p').innerHTML='<div class="chartmsg">Geen pompdruk in deze meting.</div>';
     else { $('cmp_week_p').innerHTML=cmpChart(labels,[{name:'pompdruk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'cmp_week_p',xticks,yunit:'bar',onMask,thresh:DRUK_ON}); wireHover('cmp_week_p'); }
+  }
+}
+function renderToren(){
+  const ids=['tw_t','tw_rh','tw_vd','tw_p']; if(!$(ids[0])) return;
+  if(!MEAS||!MEAS.length){ ids.forEach(id=>{const b=$(id); if(b)b.innerHTML='<div class="chartmsg">Geen meetdata geladen.</div>';}); return; }
+  const labels=MEAS.map(m=>m[0].slice(8,10)+'-'+m[0].slice(11,13)+'u');
+  let xticks=[]; MEAS.forEach((m,i)=>{ if(m[0].slice(11,13)==='00') xticks.push({i,label:(+m[0].slice(8,10))+' '+MND[+m[0].slice(5,7)-1]}); });
+  if(xticks.length<2){ xticks=[]; const step=Math.max(1,Math.round(MEAS.length/8)); for(let i=0;i<MEAS.length;i+=step)xticks.push({i,label:labels[i]}); }
+  const pT=MEAS.map(m=>m[1]), oT=MEAS.map(m=>m[2]), pRH=MEAS.map(m=>m[3]), oRH=MEAS.map(m=>m[4]);
+  const pVD=MEAS.map(m=>(m[1]!=null&&m[3]!=null)?vdGm3(m[1],m[3]):null), oVD=MEAS.map(m=>(m[2]!=null&&m[4]!=null)?vdGm3(m[2],m[4]):null);
+  const druk=MEAS.map(m=>m.length>5?m[5]:null), onMask=druk.map(d=>d!=null&&d>=DRUK_ON);
+  const C={p:'#4ade80',o:'#ff5d6c'};
+  const draw=(id,pp,oo,unit,dec)=>{ if(!$(id))return;
+    $(id).innerHTML=cmpChart(labels,[{name:'Proef',color:C.p,data:pp},{name:'Onbehandeld',color:C.o,w:1.8,data:oo}],{decimals:dec,unit:' '+unit,id,xticks,yunit:unit,onMask}); wireHover(id); };
+  draw('tw_t',pT,oT,'°C',1); draw('tw_rh',pRH,oRH,'%',0); draw('tw_vd',pVD,oVD,'g/m³',1);
+  if($('tw_p')){ if(!druk.some(v=>v!=null)) $('tw_p').innerHTML='<div class="chartmsg">Geen pompdruk in deze meting.</div>';
+    else { $('tw_p').innerHTML=cmpChart(labels,[{name:'pompdruk',color:'#ff9d3c',data:druk}],{decimals:1,unit:' bar',id:'tw_p',xticks,yunit:'bar',onMask,thresh:DRUK_ON}); wireHover('tw_p'); } }
+  const sgn=(v,d)=>(v>=0?'+':'−')+nl(Math.abs(v),d);
+  const tS=diffStats(pT,oT), rS=diffStats(pRH,oRH), vS=diffStats(pVD,oVD);
+  const set=(pre,S,d,u)=>{ if(!S){['bias','mae','max','r'].forEach(k=>{const el=$('tw_'+pre+k);if(el)el.textContent='—';});return;}
+    if($('tw_'+pre+'bias'))$('tw_'+pre+'bias').textContent=sgn(S.bias,d)+' '+u;
+    if($('tw_'+pre+'mae'))$('tw_'+pre+'mae').textContent=nl(S.mae,d)+' '+u;
+    if($('tw_'+pre+'max'))$('tw_'+pre+'max').textContent=nl(S.maxAbs,d)+' '+u+' · '+labels[S.maxIdx];
+    if($('tw_'+pre+'r'))$('tw_'+pre+'r').textContent=isNaN(S.r)?'—':nl(S.r,2); };
+  set('t',tS,1,'°C'); set('r',rS,0,'%'); set('v',vS,1,'g/m³');
+  if($('tw_vdcount')){
+    const byDay={};
+    MEAS.forEach((m,i)=>{ const day=m[0].slice(0,10); const b=byDay[day]||(byDay[day]={p:0,o:0});
+      if(pVD[i]!=null&&pVD[i]<VD_LO)b.p++; if(oVD[i]!=null&&oVD[i]<VD_LO)b.o++; });
+    const days=Object.keys(byDay).sort(); let tp=0,to=0;
+    let h='<div class="vdc"><div class="r h"><span>dag</span><span>Proef · uren VD&lt;10</span><span>Onbehandeld · uren VD&lt;10</span></div>';
+    days.forEach(day=>{ const b=byDay[day]; tp+=b.p; to+=b.o; const lbl=(+day.slice(8,10))+' '+MND[+day.slice(5,7)-1];
+      h+='<div class="r"><span>'+lbl+'</span><b>'+b.p+' u</b><b>'+b.o+' u</b></div>'; });
+    h+='<div class="r tot"><span>Totaal ('+days.length+' dg)</span><b>'+tp+' u</b><b>'+to+' u</b></div></div>';
+    $('tw_vdcount').innerHTML=h;
+  }
+  if($('tw_dT'))$('tw_dT').textContent = tS?sgn(tS.bias,1)+' °C':'—';
+  if($('tw_dRH'))$('tw_dRH').textContent = rS?sgn(rS.bias,0)+' %':'—';
+  if($('tw_dVD'))$('tw_dVD').textContent = vS?sgn(vS.bias,1)+' g/m³':'—';
+  const onU=onMask.filter(Boolean).length, dm=druk.filter(v=>v!=null), dMax=dm.length?Math.max(...dm):null;
+  if($('tw_dDruk'))$('tw_dDruk').textContent = dMax!=null?('piek '+nl(dMax,1)+' bar · '+onU+' u ≥ '+nl(DRUK_ON,1)+' bar'):'geen drukdata';
+  const V=$('tw_verdict'); if(V){
+    if(!tS){ V.textContent='Geen onbehandelde referentie (kolom "Onbehandeld") in deze meting.'; }
+    else { const warm=tS.bias>=0?'warmer':'koeler', dry=(vS&&vS.bias>=0)?'droger':'vochtiger';
+      V.innerHTML='Het proefperceel (met toren) is gemiddeld <b>'+sgn(tS.bias,1)+' °C</b> '+warm+
+        (vS?(' en <b>'+sgn(vS.bias,1)+' g/m³</b> '+dry):'')+' dan de onbehandelde referentie. '+
+        'Het grootste temperatuurverschil ('+nl(tS.maxAbs,1)+' °C) was rond '+labels[tS.maxIdx]+'.'+
+        '<br><span class="sub">Zuiver toren-effect: zelfde perceel en periode. Kijk of de grootste verschillen samenvallen met de oranje "toren aan"-momenten in de grafieken.</span>'; }
   }
 }
 function applyCurrentView(){
@@ -1342,7 +1478,7 @@ function loadCsvFile(file){
     CMP=null;
     try{ localStorage.setItem(MEAS_KEY, JSON.stringify({meas:MEAS,range:MEAS_RANGE})); }catch(e){}
     st.textContent='Geladen: '+out.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
-    renderCompare();
+    renderCompare(); renderToren();
   }catch(err){ st.textContent='Fout: '+err.message; } };
   rd.onerror=()=>{ st.textContent='Kon bestand niet lezen.'; };
   rd.readAsText(file);
@@ -1351,7 +1487,7 @@ function restoreMeas(){   /* haalt de laatst geladen CSV terug uit de browserops
   try{ const raw=localStorage.getItem(MEAS_KEY); if(!raw) return false;
     const o=JSON.parse(raw); if(!o||!o.meas||!o.meas.length) return false;
     MEAS=o.meas; MEAS_RANGE=o.range; CMP=null;
-    if($('cmpFileStat')) $('cmpFileStat').textContent='Laatst geladen: '+MEAS.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
+    if($('cmpFileStat')) $('cmpFileStat').textContent='✓ onthouden upload: '+MEAS.length+' uren · '+MEAS_RANGE.start+' → '+MEAS_RANGE.end;
     return true;
   }catch(e){ return false; }
 }
@@ -1359,18 +1495,19 @@ function resetMeas(){     /* terug naar de ingebakken voorbeelddata */
   MEAS=MEAS_BAKED.slice(); MEAS_RANGE=Object.assign({},MEAS_RANGE_BAKED); CMP=null;
   try{ localStorage.removeItem(MEAS_KEY); }catch(e){}
   if($('cmpFileStat')) $('cmpFileStat').textContent='voorbeelddata: '+cmpPeriodText()+' ('+MEAS.length+' u)';
-  renderCompare();
+  renderCompare(); renderToren();
 }
 function setView(v){
   document.body.dataset.view=v;
-  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewCmp').classList.toggle('on',v==="cmp");$('viewToday').classList.toggle('on',v==="today");
-  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabCmp').classList.toggle('on',v==="cmp");$('tabToday').classList.toggle('on',v==="today");
+  $('viewFrost').classList.toggle('on',v==="frost");$('viewVd').classList.toggle('on',v==="vd");$('viewLeaf').classList.toggle('on',v==="leaf");$('viewCmp').classList.toggle('on',v==="cmp");$('viewToren').classList.toggle('on',v==="toren");$('viewToday').classList.toggle('on',v==="today");
+  $('tabFrost').classList.toggle('on',v==="frost");$('tabVd').classList.toggle('on',v==="vd");$('tabLeaf').classList.toggle('on',v==="leaf");$('tabCmp').classList.toggle('on',v==="cmp");$('tabToren').classList.toggle('on',v==="toren");$('tabToday').classList.toggle('on',v==="today");
   if(FC.hourly){relabelDays();}
   if(v==="today"){ renderToday($('daySel').value || new Date().toLocaleDateString('sv-SE')); }
   else if(v==="cmp"){ renderCompare(); renderCmpWeek(); }
+  else if(v==="toren"){ renderToren(); }
   else if(FC.hourly){ applyCurrentView(); }
 }
-$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabCmp').onclick=()=>setView("cmp"); $('tabToday').onclick=()=>setView("today");
+$('tabFrost').onclick=()=>setView("frost"); $('tabVd').onclick=()=>setView("vd"); $('tabLeaf').onclick=()=>setView("leaf"); $('tabCmp').onclick=()=>setView("cmp"); $('tabToren').onclick=()=>setView("toren"); $('tabToday').onclick=()=>setView("today");
 $('refresh').onclick=fetchForecast;
 $('daySel').onchange=applyCurrentView;
 $('cmpFile').onchange=e=>loadCsvFile(e.target.files[0]);
